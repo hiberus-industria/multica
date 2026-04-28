@@ -110,6 +110,19 @@ function formatActivity(
       return `renamed this issue from "${details.from ?? "?"}" to "${details.to ?? "?"}"`;
     case "description_updated":
       return "updated the description";
+    case "redmine_linked": {
+      const fromId = details.from;
+      const toId = details.to ?? "?";
+      const toTitle = details.to_title;
+      const label = toTitle ? `#${toId} – ${toTitle}` : `#${toId}`;
+      if (fromId) return `changed linked Redmine issue from #${fromId} to ${label}`;
+      return `linked Redmine issue ${label}`;
+    }
+    case "redmine_unlinked": {
+      const fromId = details.from;
+      if (fromId) return `unlinked Redmine issue #${fromId}`;
+      return "unlinked Redmine issue";
+    }
     case "task_completed":
       return "completed the task";
     case "task_failed":

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/service"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
 // ---- Response types ----
@@ -471,6 +472,7 @@ type UpsertIssueLinkRequest struct {
 func (h *Handler) UpsertIssueIntegrationLink(w http.ResponseWriter, r *http.Request) {
 	workspaceID := h.resolveWorkspaceID(r)
 	issueID := chi.URLParam(r, "id")
+	userID := requestUserID(r)
 
 	var req UpsertIssueLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -481,6 +483,13 @@ func (h *Handler) UpsertIssueIntegrationLink(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, "provider and external_issue_id are required")
 		return
 	}
+
+	// Fetch the existing link (if any) to detect changes.
+	existing, _ := h.Queries.GetIssueIntegrationLink(r.Context(), db.GetIssueIntegrationLinkParams{
+		WorkspaceID: parseUUID(workspaceID),
+		IssueID:     parseUUID(issueID),
+		Provider:    req.Provider,
+	})
 
 	row, err := h.Queries.UpsertIssueIntegrationLink(r.Context(), db.UpsertIssueIntegrationLinkParams{
 		WorkspaceID:        parseUUID(workspaceID),
@@ -494,6 +503,17 @@ func (h *Handler) UpsertIssueIntegrationLink(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusInternalServerError, "failed to save issue integration link")
 		return
 	}
+
+	actorType, actorID := h.resolveActor(r, userID, workspaceID)
+	payload := map[string]any{
+		"issue_id":  issueID,
+		"provider":  req.Provider,
+		"from":      existing.ExternalIssueID,
+		"to":        req.ExternalIssueID,
+		"to_title":  req.ExternalIssueTitle,
+	}
+	h.publish(protocol.EventIssueIntegrationLinkChanged, workspaceID, actorType, actorID, payload)
+
 	writeJSON(w, http.StatusOK, issueLinkToResponse(row))
 }
 
@@ -501,6 +521,14 @@ func (h *Handler) DeleteIssueIntegrationLink(w http.ResponseWriter, r *http.Requ
 	workspaceID := h.resolveWorkspaceID(r)
 	issueID := chi.URLParam(r, "id")
 	provider := chi.URLParam(r, "provider")
+	userID := requestUserID(r)
+
+	// Fetch the existing link before deletion for activity details.
+	existing, _ := h.Queries.GetIssueIntegrationLink(r.Context(), db.GetIssueIntegrationLinkParams{
+		WorkspaceID: parseUUID(workspaceID),
+		IssueID:     parseUUID(issueID),
+		Provider:    provider,
+	})
 
 	err := h.Queries.DeleteIssueIntegrationLink(r.Context(), db.DeleteIssueIntegrationLinkParams{
 		WorkspaceID: parseUUID(workspaceID),
@@ -511,5 +539,14 @@ func (h *Handler) DeleteIssueIntegrationLink(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusInternalServerError, "failed to delete issue integration link")
 		return
 	}
+
+	actorType, actorID := h.resolveActor(r, userID, workspaceID)
+	payload := map[string]any{
+		"issue_id": issueID,
+		"provider": provider,
+		"from":     existing.ExternalIssueID,
+	}
+	h.publish(protocol.EventIssueIntegrationLinkDeleted, workspaceID, actorType, actorID, payload)
+
 	w.WriteHeader(http.StatusNoContent)
 }

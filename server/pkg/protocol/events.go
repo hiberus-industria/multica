@@ -50,6 +50,10 @@ const (
 	EventSubscriberAdded   = "subscriber:added"
 	EventSubscriberRemoved = "subscriber:removed"
 
+	// Integration link events
+	EventIssueIntegrationLinkChanged = "issue_integration_link:changed"
+	EventIssueIntegrationLinkDeleted = "issue_integration_link:deleted"
+
 	// Activity events
 	EventActivityCreated = "activity:created"
 

@@ -211,6 +211,76 @@ func registerActivityListeners(bus *events.Bus, queries *db.Queries) {
 		}
 	})
 
+	// issue_integration_link:changed — record "redmine_linked" activity
+	bus.Subscribe(protocol.EventIssueIntegrationLinkChanged, func(e events.Event) {
+		payload, ok := e.Payload.(map[string]any)
+		if !ok {
+			return
+		}
+		issueID, _ := payload["issue_id"].(string)
+		if issueID == "" {
+			return
+		}
+		fromID, _ := payload["from"].(string)
+		toID, _ := payload["to"].(string)
+		var toTitle *string
+		if t, ok := payload["to_title"].(*string); ok {
+			toTitle = t
+		}
+		detailsMap := map[string]string{
+			"from": fromID,
+			"to":   toID,
+		}
+		if toTitle != nil {
+			detailsMap["to_title"] = *toTitle
+		}
+		details, _ := json.Marshal(detailsMap)
+		activity, err := queries.CreateActivity(ctx, db.CreateActivityParams{
+			WorkspaceID: parseUUID(e.WorkspaceID),
+			IssueID:     parseUUID(issueID),
+			ActorType:   util.StrToText(e.ActorType),
+			ActorID:     parseUUID(e.ActorID),
+			Action:      "redmine_linked",
+			Details:     details,
+		})
+		if err != nil {
+			slog.Error("activity: failed to record redmine link change",
+				"issue_id", issueID, "error", err)
+			return
+		}
+		publishActivityEvent(bus, e, activity)
+	})
+
+	// issue_integration_link:deleted — record "redmine_unlinked" activity
+	bus.Subscribe(protocol.EventIssueIntegrationLinkDeleted, func(e events.Event) {
+		payload, ok := e.Payload.(map[string]any)
+		if !ok {
+			return
+		}
+		issueID, _ := payload["issue_id"].(string)
+		if issueID == "" {
+			return
+		}
+		fromID, _ := payload["from"].(string)
+		details, _ := json.Marshal(map[string]string{
+			"from": fromID,
+		})
+		activity, err := queries.CreateActivity(ctx, db.CreateActivityParams{
+			WorkspaceID: parseUUID(e.WorkspaceID),
+			IssueID:     parseUUID(issueID),
+			ActorType:   util.StrToText(e.ActorType),
+			ActorID:     parseUUID(e.ActorID),
+			Action:      "redmine_unlinked",
+			Details:     details,
+		})
+		if err != nil {
+			slog.Error("activity: failed to record redmine link deletion",
+				"issue_id", issueID, "error", err)
+			return
+		}
+		publishActivityEvent(bus, e, activity)
+	})
+
 	// task:completed — record "task_completed" activity
 	bus.Subscribe(protocol.EventTaskCompleted, func(e events.Event) {
 		handleTaskActivity(ctx, bus, queries, e, "task_completed")
