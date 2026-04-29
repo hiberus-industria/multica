@@ -6,7 +6,10 @@ import { ChevronRight, ListTodo } from "lucide-react";
 import type { IssueStatus } from "@multica/core/types";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { useIssueViewStore, useClearFiltersOnWorkspaceChange } from "@multica/core/issues/stores/view-store";
+import {
+  useIssueViewStore,
+  useClearFiltersOnWorkspaceChange,
+} from "@multica/core/issues/stores/view-store";
 import { useIssuesScopeStore } from "@multica/core/issues/stores/issues-scope-store";
 import { ViewStoreProvider } from "@multica/core/issues/stores/view-store-context";
 import { filterIssues } from "../utils/filter";
@@ -14,8 +17,12 @@ import { BOARD_STATUSES } from "@multica/core/issues/config";
 import { useCurrentWorkspace } from "@multica/core/paths";
 import { WorkspaceAvatar } from "../../workspace/workspace-avatar";
 import { useWorkspaceId } from "@multica/core/hooks";
-import { issueListOptions, childIssueProgressOptions } from "@multica/core/issues/queries";
+import {
+  issueListOptions,
+  childIssueProgressOptions,
+} from "@multica/core/issues/queries";
 import { useUpdateIssue } from "@multica/core/issues/mutations";
+import { useTimerStore } from "@multica/core/time-entries/timer-store";
 import { useIssueSelectionStore } from "@multica/core/issues/stores/selection-store";
 import { PageHeader } from "../../layout/page-header";
 import { IssuesHeader } from "./issues-header";
@@ -25,7 +32,9 @@ import { BatchActionToolbar } from "./batch-action-toolbar";
 
 export function IssuesPage() {
   const wsId = useWorkspaceId();
-  const { data: allIssues = [], isLoading: loading } = useQuery(issueListOptions(wsId));
+  const { data: allIssues = [], isLoading: loading } = useQuery(
+    issueListOptions(wsId),
+  );
 
   const workspace = useCurrentWorkspace();
   const scope = useIssuesScopeStore((s) => s.scope);
@@ -55,13 +64,33 @@ export function IssuesPage() {
   }, [allIssues, scope]);
 
   const issues = useMemo(
-    () => filterIssues(scopedIssues, { statusFilters, priorityFilters, assigneeFilters, includeNoAssignee, creatorFilters, projectFilters, includeNoProject }),
-    [scopedIssues, statusFilters, priorityFilters, assigneeFilters, includeNoAssignee, creatorFilters, projectFilters, includeNoProject],
+    () =>
+      filterIssues(scopedIssues, {
+        statusFilters,
+        priorityFilters,
+        assigneeFilters,
+        includeNoAssignee,
+        creatorFilters,
+        projectFilters,
+        includeNoProject,
+      }),
+    [
+      scopedIssues,
+      statusFilters,
+      priorityFilters,
+      assigneeFilters,
+      includeNoAssignee,
+      creatorFilters,
+      projectFilters,
+      includeNoProject,
+    ],
   );
 
   // Fetch sub-issue progress from the backend so counts are accurate
   // regardless of client-side pagination or filtering of done issues.
-  const { data: childProgressMap = new Map() } = useQuery(childIssueProgressOptions(wsId));
+  const { data: childProgressMap = new Map() } = useQuery(
+    childIssueProgressOptions(wsId),
+  );
 
   const visibleStatuses = useMemo(() => {
     if (statusFilters.length > 0)
@@ -92,8 +121,30 @@ export function IssuesPage() {
         { id: issueId, ...updates },
         { onError: () => toast.error("Failed to move issue") },
       );
+
+      if (
+        newStatus === "in_progress" &&
+        !useTimerStore.getState().activeTimer
+      ) {
+        const issue = allIssues.find((i) => i.id === issueId);
+        if (!issue) return;
+
+        toast("Start tracking time?", {
+          description: `${issue.identifier} is now in progress`,
+          action: {
+            label: "Start timer",
+            onClick: () => {
+              useTimerStore
+                .getState()
+                .startTimer(issue.id, issue.identifier, issue.title);
+              toast.success(`Timer started for ${issue.identifier}`);
+            },
+          },
+          duration: 8000,
+        });
+      }
     },
-    [updateIssueMutation],
+    [updateIssueMutation, allIssues],
   );
 
   if (loading) {
@@ -170,7 +221,11 @@ export function IssuesPage() {
                 childProgressMap={childProgressMap}
               />
             ) : (
-              <ListView issues={issues} visibleStatuses={visibleStatuses} childProgressMap={childProgressMap} />
+              <ListView
+                issues={issues}
+                visibleStatuses={visibleStatuses}
+                childProgressMap={childProgressMap}
+              />
             )}
           </div>
         )}
