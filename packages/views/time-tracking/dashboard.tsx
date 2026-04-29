@@ -4,8 +4,21 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardOptions } from "@multica/core/time-entries/queries";
 import { useWorkspaceId } from "@multica/core/hooks";
-import { Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  CalendarDays,
+  Hash,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  MinusCircle,
+} from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
+import { Skeleton } from "@multica/ui/components/ui/skeleton";
+import { PageHeader } from "../layout/page-header";
 import { cn } from "@multica/ui/lib/utils";
 import {
   ChartContainer,
@@ -14,6 +27,9 @@ import {
   type ChartConfig,
 } from "@multica/ui/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell } from "recharts";
+import type { TimeEntrySyncStatus } from "@multica/core/types";
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getWeekRange(offset: number): {
   start: string;
@@ -47,11 +63,19 @@ function getWeekRange(offset: number): {
 }
 
 function formatMinutes(minutes: number): string {
+  if (minutes === 0) return "0h";
   if (minutes < 60) return `${minutes}m`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
+
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr + "T00:00:00");
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const CHART_COLOR_KEYS = [
   "chart-1",
@@ -64,8 +88,6 @@ const CHART_COLOR_KEYS = [
   "chart-8",
 ] as const;
 
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 const dailyChartConfig = {
   hours: { label: "Hours", color: "var(--color-chart-1)" },
 } satisfies ChartConfig;
@@ -73,6 +95,104 @@ const dailyChartConfig = {
 const issueChartConfig = {
   hours: { label: "Hours", color: "var(--color-chart-2)" },
 } satisfies ChartConfig;
+
+// ─── Sync status badge ───────────────────────────────────────────────────────
+
+function SyncBadge({ status }: { status: TimeEntrySyncStatus }) {
+  if (status === "synced") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+        <CheckCircle2 className="size-2.5" />
+        Synced
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+        <AlertCircle className="size-2.5" />
+        Failed
+      </span>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+        <Loader2 className="size-2.5 animate-spin" />
+        Pending
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+      <MinusCircle className="size-2.5" />
+      Not linked
+    </span>
+  );
+}
+
+// ─── KPI card ────────────────────────────────────────────────────────────────
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <div className="rounded-lg border bg-card px-4 py-3">
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <Icon className="size-3.5 text-muted-foreground/50" />
+      </div>
+      <p className="text-xl font-semibold tabular-nums tracking-tight">
+        {value}
+      </p>
+      {sub && <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Loading skeleton ────────────────────────────────────────────────────────
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 p-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-19 rounded-lg" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Skeleton className="h-75 rounded-lg" />
+        <Skeleton className="h-75 rounded-lg" />
+      </div>
+      <Skeleton className="h-55 rounded-lg" />
+      <Skeleton className="h-75 rounded-lg" />
+    </div>
+  );
+}
+
+// ─── Empty state ─────────────────────────────────────────────────────────────
+
+function EmptyState() {
+  return (
+    <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 text-muted-foreground">
+      <Clock className="h-10 w-10 text-muted-foreground/40" />
+      <p className="text-sm">No time entries for this period</p>
+      <p className="text-xs">
+        Start a timer or log time on an issue to see your data here.
+      </p>
+    </div>
+  );
+}
+
+// ─── Dashboard ───────────────────────────────────────────────────────────────
 
 export function TimeTrackingDashboard() {
   const wsId = useWorkspaceId();
@@ -84,46 +204,66 @@ export function TimeTrackingDashboard() {
     dashboardOptions(wsId, range.start, range.end),
   );
 
-  const dailyData = useMemo(() => {
-    if (!data?.daily) return [];
-    return data.daily.map((d) => {
+  // Today's day index (Mon=0..Sun=6), only relevant when viewing current week
+  const todayDayIdx = useMemo(() => {
+    if (weekOffset !== 0) return -1;
+    const d = new Date().getDay();
+    return d === 0 ? 6 : d - 1;
+  }, [weekOffset]);
+
+  // Full 7-day array — fills gaps with zeros so all bars are always rendered
+  const fullWeekData = useMemo(() => {
+    const byDay = new Map<number, { hours: number; minutes: number }>();
+    for (const d of data?.daily ?? []) {
       const date = new Date(d.date + "T00:00:00");
-      const dayIdx = (date.getDay() + 6) % 7; // Mon=0 .. Sun=6
-      return {
-        name: DAY_NAMES[dayIdx],
-        date: d.date,
+      const dayIdx = (date.getDay() + 6) % 7;
+      byDay.set(dayIdx, {
         hours: +(d.total_minutes / 60).toFixed(2),
         minutes: d.total_minutes,
-      };
-    });
-  }, [data?.daily]);
+      });
+    }
+    return DAY_NAMES.map((name, idx) => ({
+      name,
+      hours: byDay.get(idx)?.hours ?? 0,
+      minutes: byDay.get(idx)?.minutes ?? 0,
+      isToday: idx === todayDayIdx,
+    }));
+  }, [data?.daily, todayDayIdx]);
 
+  // Activity breakdown sorted descending
   const activityData = useMemo(() => {
     if (!data?.by_activity) return [];
-    return data.by_activity.map((a, i) => ({
-      name: a.activity || "No activity",
-      key: `act-${i}`,
-      value: a.total_minutes,
-    }));
-  }, [data?.by_activity]);
+    const total = data.total_minutes;
+    return data.by_activity
+      .slice()
+      .sort((a, b) => b.total_minutes - a.total_minutes)
+      .map((a, i) => ({
+        name: a.activity || "No activity",
+        key: `act-${i}`,
+        value: a.total_minutes,
+        pct: total > 0 ? Math.round((a.total_minutes / total) * 100) : 0,
+        colorKey: CHART_COLOR_KEYS[i % CHART_COLOR_KEYS.length]!,
+      }));
+  }, [data?.by_activity, data?.total_minutes]);
 
-  const activityChartConfig = useMemo(() => {
-    return Object.fromEntries(
-      activityData.map((a, i) => [
-        a.key,
-        {
-          label: a.name,
-          color: `var(--color-${CHART_COLOR_KEYS[i % CHART_COLOR_KEYS.length]})`,
-        },
-      ]),
-    ) satisfies ChartConfig;
-  }, [activityData]);
+  const activityChartConfig = useMemo(
+    () =>
+      Object.fromEntries(
+        activityData.map((a) => [
+          a.key,
+          { label: a.name, color: `var(--color-${a.colorKey})` },
+        ]),
+      ) satisfies ChartConfig,
+    [activityData],
+  );
 
+  // Top issues (horizontal bars)
   const issueData = useMemo(() => {
     if (!data?.by_issue) return [];
     return data.by_issue
+      .slice()
       .sort((a, b) => b.total_minutes - a.total_minutes)
-      .slice(0, 10)
+      .slice(0, 8)
       .map((i) => ({
         name: `#${i.issue_number}`,
         title: i.issue_title,
@@ -132,17 +272,47 @@ export function TimeTrackingDashboard() {
       }));
   }, [data?.by_issue]);
 
+  // KPI values
+  const kpis = useMemo(() => {
+    if (!data) return null;
+    const activeDays = data.daily.filter((d) => d.total_minutes > 0).length;
+    const avgMinutes =
+      activeDays > 0 ? Math.round(data.total_minutes / activeDays) : 0;
+    const peak = data.daily.reduce(
+      (best: { date: string; total_minutes: number } | null, d) =>
+        !best || d.total_minutes > best.total_minutes ? d : best,
+      null,
+    );
+    return {
+      total: formatMinutes(data.total_minutes),
+      totalSub: `${data.entries.length} entr${data.entries.length === 1 ? "y" : "ies"}`,
+      avg: avgMinutes > 0 ? formatMinutes(avgMinutes) : "—",
+      avgSub:
+        activeDays > 0
+          ? `${activeDays} active day${activeDays > 1 ? "s" : ""}`
+          : "no logged days",
+      peak:
+        peak && peak.total_minutes > 0
+          ? formatMinutes(peak.total_minutes)
+          : "—",
+      peakSub:
+        peak && peak.total_minutes > 0 ? formatDate(peak.date) : undefined,
+      entries: String(data.entries.length),
+      entriesSub: `${formatDate(data.start_date)} – ${formatDate(data.end_date)}`,
+    };
+  }, [data]);
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className="flex flex-1 min-h-0 flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <PageHeader className="justify-between px-5">
         <div className="flex items-center gap-2">
-          <Clock className="size-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">Time Tracking</h1>
+          <Clock className="size-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Time Tracking</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
             className="size-7"
             onClick={() => setWeekOffset((w) => w - 1)}
@@ -152,13 +322,16 @@ export function TimeTrackingDashboard() {
           <Button
             variant="ghost"
             size="sm"
-            className="text-xs min-w-[100px] justify-center"
+            className={cn(
+              "h-7 min-w-27 justify-center text-xs",
+              weekOffset !== 0 && "text-muted-foreground",
+            )}
             onClick={() => setWeekOffset(0)}
           >
             {range.label}
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
             className="size-7"
             onClick={() => setWeekOffset((w) => w + 1)}
@@ -167,232 +340,307 @@ export function TimeTrackingDashboard() {
             <ChevronRight className="size-4" />
           </Button>
         </div>
-      </div>
+      </PageHeader>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
-          Loading dashboard…
-        </div>
-      ) : !data || data.total_minutes === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-sm gap-1">
-          <Clock className="size-8 mb-2 opacity-40" />
-          <p>No time entries for this period</p>
-          <p className="text-xs">Start a timer or log time on an issue</p>
-        </div>
+      {!isLoading && (!data || data.total_minutes === 0) ? (
+        <EmptyState />
       ) : (
-        <>
-          {/* Summary stat */}
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground mb-1">Total logged</p>
-            <p className="text-2xl font-bold tabular-nums">
-              {formatMinutes(data.total_minutes)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {range.start} → {range.end} · {data.entries.length} entries
-            </p>
-          </div>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {isLoading ? (
+            <DashboardSkeleton />
+          ) : (
+            <div className="space-y-6 p-6">
+              {/* KPI row */}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <KpiCard
+                  label="Total logged"
+                  value={kpis!.total}
+                  sub={kpis!.totalSub}
+                  icon={Clock}
+                />
+                <KpiCard
+                  label="Avg per active day"
+                  value={kpis!.avg}
+                  sub={kpis!.avgSub}
+                  icon={TrendingUp}
+                />
+                <KpiCard
+                  label="Peak day"
+                  value={kpis!.peak}
+                  sub={kpis!.peakSub}
+                  icon={CalendarDays}
+                />
+                <KpiCard
+                  label="Entries"
+                  value={kpis!.entries}
+                  sub={kpis!.entriesSub}
+                  icon={Hash}
+                />
+              </div>
 
-          {/* Charts row */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Daily bar chart */}
-            <div className="rounded-lg border bg-card p-4">
-              <h2 className="text-sm font-medium mb-3">Daily breakdown</h2>
-              <ChartContainer
-                config={dailyChartConfig}
-                className="h-[200px] w-full"
+              {/* Charts row */}
+              <div
+                className={cn(
+                  "grid gap-4",
+                  activityData.length > 0 ? "lg:grid-cols-2" : "grid-cols-1",
+                )}
               >
-                <BarChart data={dailyData}>
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `${v}h`}
-                    width={35}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value) =>
-                          typeof value === "number"
-                            ? `${value}h`
-                            : String(value)
+                {/* Daily breakdown */}
+                <div className="rounded-lg border bg-card p-5">
+                  <h2 className="mb-4 text-sm font-medium">Daily breakdown</h2>
+                  <ChartContainer
+                    config={dailyChartConfig}
+                    className="h-60 w-full"
+                  >
+                    <BarChart data={fullWeekData} barCategoryGap="30%">
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(v) => `${v}h`}
+                        width={32}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(_value, _name, item) => {
+                              const min = (
+                                item as { payload: { minutes: number } }
+                              ).payload.minutes;
+                              return min > 0 ? formatMinutes(min) : "—";
+                            }}
+                          />
                         }
                       />
-                    }
-                  />
-                  <Bar
-                    dataKey="hours"
-                    fill="var(--color-chart-1)"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={40}
-                  />
-                </BarChart>
-              </ChartContainer>
-            </div>
+                      <Bar
+                        dataKey="hours"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={48}
+                      >
+                        {fullWeekData.map((d, idx) => (
+                          <Cell
+                            key={idx}
+                            fill={
+                              d.hours > 0
+                                ? "var(--color-chart-1)"
+                                : "var(--color-border)"
+                            }
+                            opacity={d.isToday ? 1 : d.hours > 0 ? 0.7 : 1}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                </div>
 
-            {/* Activity pie chart */}
-            {activityData.length > 0 && (
-              <div className="rounded-lg border bg-card p-4">
-                <h2 className="text-sm font-medium mb-3">By activity</h2>
-                <ChartContainer
-                  config={activityChartConfig}
-                  className="mx-auto aspect-square max-h-[200px]"
-                >
-                  <PieChart>
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value) =>
-                            typeof value === "number"
-                              ? formatMinutes(value)
-                              : String(value)
-                          }
-                          nameKey="name"
-                        />
-                      }
-                    />
-                    <Pie
-                      data={activityData}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={45}
-                      outerRadius={75}
-                      paddingAngle={2}
-                    >
-                      {activityData.map((_, idx) => (
-                        <Cell
-                          key={idx}
-                          fill={`var(--color-${CHART_COLOR_KEYS[idx % CHART_COLOR_KEYS.length]})`}
-                        />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ChartContainer>
-                {/* Legend */}
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                  {activityData.map((a, i) => (
-                    <div
-                      key={a.key}
-                      className="flex items-center gap-1 text-[11px]"
-                    >
-                      <span
-                        className="size-2 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: `var(--color-${CHART_COLOR_KEYS[i % CHART_COLOR_KEYS.length]})`,
-                        }}
-                      />
-                      <span className="text-muted-foreground">{a.name}</span>
+                {/* Activity breakdown */}
+                {activityData.length > 0 && (
+                  <div className="rounded-lg border bg-card p-5">
+                    <h2 className="mb-4 text-sm font-medium">By activity</h2>
+                    <div className="flex items-center gap-5">
+                      <ChartContainer
+                        config={activityChartConfig}
+                        className="aspect-square h-45 shrink-0"
+                      >
+                        <PieChart>
+                          <ChartTooltip
+                            content={
+                              <ChartTooltipContent
+                                formatter={(value) =>
+                                  typeof value === "number"
+                                    ? formatMinutes(value)
+                                    : String(value)
+                                }
+                                nameKey="name"
+                              />
+                            }
+                          />
+                          <Pie
+                            data={activityData}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={50}
+                            outerRadius={78}
+                            paddingAngle={2}
+                          >
+                            {activityData.map((a) => (
+                              <Cell
+                                key={a.key}
+                                fill={`var(--color-${a.colorKey})`}
+                              />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ChartContainer>
+                      {/* Legend */}
+                      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+                        {activityData.map((a) => (
+                          <div
+                            key={a.key}
+                            className="flex min-w-0 items-center gap-2"
+                          >
+                            <span
+                              className="size-2 shrink-0 rounded-full"
+                              style={{
+                                backgroundColor: `var(--color-${a.colorKey})`,
+                              }}
+                            />
+                            <span className="flex-1 truncate text-xs text-muted-foreground">
+                              {a.name}
+                            </span>
+                            <span className="shrink-0 text-xs font-medium tabular-nums">
+                              {formatMinutes(a.value)}
+                            </span>
+                            <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
+                              {a.pct}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Top issues */}
+              {issueData.length > 0 && (
+                <div className="rounded-lg border bg-card p-5">
+                  <h2 className="mb-4 text-sm font-medium">Top issues</h2>
+                  <ChartContainer
+                    config={issueChartConfig}
+                    className="w-full"
+                    style={{
+                      height: `${Math.max(issueData.length * 44 + 40, 80)}px`,
+                    }}
+                    initialDimension={{
+                      width: 800,
+                      height: Math.max(issueData.length * 44 + 40, 80),
+                    }}
+                  >
+                    <BarChart
+                      data={issueData}
+                      layout="vertical"
+                      margin={{ left: 8, right: 8 }}
+                    >
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(v) => `${v}h`}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        tick={{ fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={48}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(_value, _name, item) => {
+                              const { title, minutes } = (
+                                item as {
+                                  payload: { title: string; minutes: number };
+                                }
+                              ).payload;
+                              return `${formatMinutes(minutes)} — ${title}`;
+                            }}
+                          />
+                        }
+                      />
+                      <Bar
+                        dataKey="hours"
+                        fill="var(--color-chart-2)"
+                        radius={[0, 4, 4, 0]}
+                        maxBarSize={28}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              )}
+
+              {/* Entries table */}
+              <div className="rounded-lg border bg-card">
+                <div className="flex items-center justify-between border-b px-5 py-3">
+                  <h2 className="text-sm font-medium">All entries</h2>
+                  <span className="text-xs text-muted-foreground">
+                    {data!.entries.length}{" "}
+                    {data!.entries.length === 1 ? "entry" : "entries"}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px]">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="whitespace-nowrap px-5 py-2 text-left font-medium text-muted-foreground">
+                          Date
+                        </th>
+                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                          Issue
+                        </th>
+                        <th className="whitespace-nowrap px-4 py-2 text-right font-medium text-muted-foreground">
+                          Duration
+                        </th>
+                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">
+                          Activity
+                        </th>
+                        <th className="px-5 py-2 text-left font-medium text-muted-foreground">
+                          Sync
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {data!.entries.map((entry) => (
+                        <tr
+                          key={entry.id}
+                          className="transition-colors hover:bg-muted/20"
+                        >
+                          <td className="whitespace-nowrap px-5 py-2.5 text-muted-foreground">
+                            {formatDate(entry.spent_on)}
+                          </td>
+                          <td className="max-w-100 px-4 py-2.5">
+                            <span className="text-muted-foreground">
+                              #{entry.issue_number}
+                            </span>{" "}
+                            <span className="truncate">
+                              {entry.issue_title}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium tabular-nums">
+                            {formatMinutes(entry.duration_minutes)}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {entry.activity_name ? (
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                {entry.activity_name}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/40">
+                                —
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-2.5">
+                            <SyncBadge status={entry.sync_status} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* By issue horizontal bar */}
-          {issueData.length > 0 && (
-            <div className="rounded-lg border bg-card p-4">
-              <h2 className="text-sm font-medium mb-3">Top issues</h2>
-              <ChartContainer
-                config={issueChartConfig}
-                className="w-full"
-                initialDimension={{
-                  width: 600,
-                  height: Math.max(issueData.length * 36, 100),
-                }}
-              >
-                <BarChart
-                  data={issueData}
-                  layout="vertical"
-                  margin={{ left: 10 }}
-                >
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `${v}h`}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={55}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value, _name, item) =>
-                          typeof value === "number"
-                            ? `${value}h — ${(item as { payload: { title: string } }).payload.title}`
-                            : String(value)
-                        }
-                      />
-                    }
-                  />
-                  <Bar
-                    dataKey="hours"
-                    fill="var(--color-chart-2)"
-                    radius={[0, 4, 4, 0]}
-                    maxBarSize={24}
-                  />
-                </BarChart>
-              </ChartContainer>
             </div>
           )}
-
-          {/* Entries table */}
-          <div className="rounded-lg border bg-card">
-            <div className="border-b px-4 py-3">
-              <h2 className="text-sm font-medium">All entries</h2>
-            </div>
-            <div className="divide-y max-h-[400px] overflow-y-auto">
-              {data.entries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center gap-3 px-4 py-2 text-[12px]"
-                >
-                  <span className="font-medium tabular-nums shrink-0 w-14">
-                    {formatMinutes(entry.duration_minutes)}
-                  </span>
-                  <span className="text-muted-foreground shrink-0 w-12">
-                    {entry.spent_on}
-                  </span>
-                  <span className="truncate">
-                    <span className="text-muted-foreground">
-                      #{entry.issue_number}
-                    </span>{" "}
-                    {entry.issue_title}
-                  </span>
-                  {entry.activity_name && (
-                    <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {entry.activity_name}
-                    </span>
-                  )}
-                  <span
-                    className={cn(
-                      "size-1.5 rounded-full shrink-0",
-                      entry.sync_status === "synced"
-                        ? "bg-emerald-500"
-                        : entry.sync_status === "failed"
-                          ? "bg-destructive"
-                          : "bg-muted-foreground",
-                    )}
-                    title={entry.sync_status}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
+        </div>
       )}
     </div>
   );
