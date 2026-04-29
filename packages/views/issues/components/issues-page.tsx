@@ -46,6 +46,7 @@ export function IssuesPage() {
   const creatorFilters = useIssueViewStore((s) => s.creatorFilters);
   const projectFilters = useIssueViewStore((s) => s.projectFilters);
   const includeNoProject = useIssueViewStore((s) => s.includeNoProject);
+  const labelFilters = useIssueViewStore((s) => s.labelFilters);
 
   // Clear filter state when switching between workspaces (URL-driven).
   useClearFiltersOnWorkspaceChange(useIssueViewStore, wsId);
@@ -73,6 +74,7 @@ export function IssuesPage() {
         creatorFilters,
         projectFilters,
         includeNoProject,
+        labelFilters,
       }),
     [
       scopedIssues,
@@ -83,6 +85,7 @@ export function IssuesPage() {
       creatorFilters,
       projectFilters,
       includeNoProject,
+      labelFilters,
     ],
   );
 

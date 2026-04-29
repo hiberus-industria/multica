@@ -58,6 +58,7 @@ import {
   AvatarGroupCount,
 } from "@multica/ui/components/ui/avatar";
 import { ActorAvatar } from "../../common/actor-avatar";
+import { PropRow } from "../../common/prop-row";
 import type {
   IssueStatus,
   IssuePriority,
@@ -77,7 +78,8 @@ import { IssueActionsDropdown, useIssueActions } from "../actions";
 import { ProjectPicker } from "../../projects/components/project-picker";
 import { CommentCard } from "./comment-card";
 import { CommentInput } from "./comment-input";
-import { AgentLiveCard, TaskRunHistory } from "./agent-live-card";
+import { AgentLiveCard } from "./agent-live-card";
+import { ExecutionLogSection } from "./execution-log-section";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@multica/core/auth";
 import { useCurrentWorkspace, useWorkspacePaths } from "@multica/core/paths";
@@ -204,29 +206,6 @@ function formatTokenCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
-}
-
-// ---------------------------------------------------------------------------
-// Property row
-// ---------------------------------------------------------------------------
-
-function PropRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex min-h-8 items-center gap-2 rounded-md px-2 -mx-2 hover:bg-accent/50 transition-colors">
-      <span className="w-16 shrink-0 text-xs text-muted-foreground">
-        {label}
-      </span>
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs truncate">
-        {children}
-      </div>
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -607,6 +586,11 @@ export function IssueDetail({
           </div>
         )}
       </div>
+
+      {/* Execution log — active runs + collapsed past runs. Self-contained;
+          owns its own collapse state and WS subscriptions. Hides itself
+          when there are no runs to show. */}
+      <ExecutionLogSection issueId={id} />
 
       {/* Token usage */}
       {usage && usage.task_count > 0 && (
@@ -1126,11 +1110,6 @@ export function IssueDetail({
                 Keyed by issue id so switching issues remounts the card and
                 clears any in-flight task state from the previous issue. */}
                 <AgentLiveCard key={id} issueId={id} />
-
-                {/* Agent execution history */}
-                <div className="mt-3">
-                  <TaskRunHistory key={id} issueId={id} />
-                </div>
 
                 {/* Timeline entries */}
                 <div className="mt-4 flex flex-col gap-3">

@@ -3,6 +3,7 @@
 import { DashboardLayout } from "@multica/views/layout";
 import { MulticaIcon } from "@multica/ui/components/common/multica-icon";
 import { SearchCommand, SearchTrigger } from "@multica/views/search";
+import { ChatFab, ChatWindow } from "@multica/views/chat";
 import { StarterContentPrompt } from "@multica/views/onboarding";
 import { FloatingTimer } from "@multica/views/time-tracking/floating-timer";
 import { IdleDetector } from "@multica/views/time-tracking/idle-detector";
@@ -15,6 +16,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       extra={
         <>
           <SearchCommand />
+          <ChatWindow />
+          <ChatFab />
           <StarterContentPrompt />
           <FloatingTimer />
           <IdleDetector />
