@@ -62,16 +62,21 @@ func projectLinkToResponse(l db.ProjectIntegrationLink) ProjectIntegrationLinkRe
 }
 
 type IssueIntegrationLinkResponse struct {
-	ID                 string  `json:"id"`
-	IssueID            string  `json:"issue_id"`
-	Provider           string  `json:"provider"`
-	ExternalIssueID    string  `json:"external_issue_id"`
-	ExternalIssueURL   *string `json:"external_issue_url"`
-	ExternalIssueTitle *string `json:"external_issue_title"`
-	CreatedAt          string  `json:"created_at"`
+	ID                 string   `json:"id"`
+	IssueID            string   `json:"issue_id"`
+	Provider           string   `json:"provider"`
+	ExternalIssueID    string   `json:"external_issue_id"`
+	ExternalIssueURL   *string  `json:"external_issue_url"`
+	ExternalIssueTitle *string  `json:"external_issue_title"`
+	EstimatedHours     *float64 `json:"estimated_hours"`
+	CreatedAt          string   `json:"created_at"`
 }
 
 func issueLinkToResponse(l db.IssueIntegrationLink) IssueIntegrationLinkResponse {
+	var estHours *float64
+	if l.EstimatedHours.Valid {
+		estHours = &l.EstimatedHours.Float64
+	}
 	return IssueIntegrationLinkResponse{
 		ID:                 uuidToString(l.ID),
 		IssueID:            uuidToString(l.IssueID),
@@ -79,6 +84,7 @@ func issueLinkToResponse(l db.IssueIntegrationLink) IssueIntegrationLinkResponse
 		ExternalIssueID:    l.ExternalIssueID,
 		ExternalIssueURL:   textToPtr(l.ExternalIssueUrl),
 		ExternalIssueTitle: textToPtr(l.ExternalIssueTitle),
+		EstimatedHours:     estHours,
 		CreatedAt:          timestampToString(l.CreatedAt),
 	}
 }
@@ -498,6 +504,7 @@ func (h *Handler) UpsertIssueIntegrationLink(w http.ResponseWriter, r *http.Requ
 		ExternalIssueID:    req.ExternalIssueID,
 		ExternalIssueUrl:   ptrToText(req.ExternalIssueURL),
 		ExternalIssueTitle: ptrToText(req.ExternalIssueTitle),
+		EstimatedHours:     h.fetchRedmineEstimatedHours(r, workspaceID, req),
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save issue integration link")
@@ -549,4 +556,44 @@ func (h *Handler) DeleteIssueIntegrationLink(w http.ResponseWriter, r *http.Requ
 	h.publish(protocol.EventIssueIntegrationLinkDeleted, workspaceID, actorType, actorID, payload)
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// fetchRedmineEstimatedHours tries to fetch estimated_hours from Redmine when
+// linking to a Redmine issue. Returns a valid pgtype.Float8 if successful,
+// or an invalid one if not applicable or failed (best effort).
+func (h *Handler) fetchRedmineEstimatedHours(r *http.Request, workspaceID string, req UpsertIssueLinkRequest) pgtype.Float8 {
+	if req.Provider != "redmine" {
+		return pgtype.Float8{}
+	}
+	redmineIssueID, err := strconv.Atoi(req.ExternalIssueID)
+	if err != nil {
+		return pgtype.Float8{}
+	}
+
+	userID := requestUserID(r)
+	if userID == "" {
+		return pgtype.Float8{}
+	}
+
+	integration, err := h.Queries.GetWorkspaceIntegration(r.Context(), db.GetWorkspaceIntegrationParams{
+		WorkspaceID: parseUUID(workspaceID),
+		Provider:    "redmine",
+	})
+	if err != nil {
+		return pgtype.Float8{}
+	}
+	cred, err := h.Queries.GetUserIntegrationCredential(r.Context(), db.GetUserIntegrationCredentialParams{
+		WorkspaceID: parseUUID(workspaceID),
+		UserID:      parseUUID(userID),
+		Provider:    "redmine",
+	})
+	if err != nil {
+		return pgtype.Float8{}
+	}
+
+	issue, err := h.RedmineClient.GetIssue(integration.InstanceUrl, cred.ApiKey, redmineIssueID)
+	if err != nil || issue.EstimatedHours == nil {
+		return pgtype.Float8{}
+	}
+	return pgtype.Float8{Float64: *issue.EstimatedHours, Valid: true}
 }

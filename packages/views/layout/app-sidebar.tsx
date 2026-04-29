@@ -25,6 +25,7 @@ import {
   ListTodo,
   Bot,
   Monitor,
+  Clock,
   ChevronDown,
   ChevronRight,
   Settings,
@@ -136,6 +137,7 @@ type NavKey =
   | "projects"
   | "autopilots"
   | "agents"
+  | "timeTracking"
   | "runtimes"
   | "skills"
   | "settings";
@@ -144,6 +146,7 @@ const personalNav: { key: NavKey; label: string; icon: typeof Inbox }[] = [
   { key: "inbox", label: "Inbox", icon: Inbox },
   { key: "chat", label: "Chat", icon: MessageSquare },
   { key: "myIssues", label: "My Issues", icon: CircleUser },
+  { key: "timeTracking", label: "Time Tracking", icon: Clock },
 ];
 
 const workspaceNav: { key: NavKey; label: string; icon: typeof Inbox }[] = [

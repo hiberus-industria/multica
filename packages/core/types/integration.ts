@@ -30,6 +30,7 @@ export interface IssueIntegrationLink {
   external_issue_id: string;
   external_issue_url: string | null;
   external_issue_title: string | null;
+  estimated_hours: number | null;
   created_at: string;
 }
 

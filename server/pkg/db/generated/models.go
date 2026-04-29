@@ -288,6 +288,7 @@ type IssueIntegrationLink struct {
 	ExternalIssueTitle pgtype.Text        `json:"external_issue_title"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	EstimatedHours     pgtype.Float8      `json:"estimated_hours"`
 }
 
 type IssueLabel struct {

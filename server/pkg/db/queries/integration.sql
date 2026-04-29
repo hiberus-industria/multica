@@ -68,12 +68,13 @@ WHERE workspace_id = $1 AND issue_id = $2
 ORDER BY provider ASC;
 
 -- name: UpsertIssueIntegrationLink :one
-INSERT INTO issue_integration_link (workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO issue_integration_link (workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title, estimated_hours)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (workspace_id, issue_id, provider) DO UPDATE SET
     external_issue_id    = EXCLUDED.external_issue_id,
     external_issue_url   = EXCLUDED.external_issue_url,
     external_issue_title = EXCLUDED.external_issue_title,
+    estimated_hours      = EXCLUDED.estimated_hours,
     updated_at           = now()
 RETURNING *;
 

@@ -7,10 +7,12 @@ import {
   Play,
   Plus,
   Trash2,
+  Pencil,
   CheckCircle,
   AlertCircle,
   Loader2,
   MinusCircle,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -18,9 +20,12 @@ import {
   issueTimeEntriesOptions,
   redmineActivitiesOptions,
 } from "@multica/core/time-entries/queries";
+import { issueIntegrationLinksOptions } from "@multica/core/integrations/queries";
 import {
   useCreateTimeEntry,
   useDeleteTimeEntry,
+  useUpdateTimeEntry,
+  useBulkRetrySyncFailed,
 } from "@multica/core/time-entries/mutations";
 import { useTimerStore } from "@multica/core/time-entries/timer-store";
 import { useAuthStore } from "@multica/core/auth";
@@ -126,8 +131,26 @@ export function IssueTimeSection({
   });
   const activities = activitiesData?.activities ?? [];
 
+  const { data: linksData } = useQuery(
+    issueIntegrationLinksOptions(wsId, issueId),
+  );
+  const estimatedHours = linksData?.links?.find(
+    (l: { provider: string; estimated_hours: number | null }) =>
+      l.provider === "redmine" && l.estimated_hours != null,
+  )?.estimated_hours;
+  const estimatedMinutes =
+    estimatedHours != null ? Math.round(estimatedHours * 60) : null;
+
   const createEntry = useCreateTimeEntry();
   const deleteEntry = useDeleteTimeEntry();
+  const updateEntry = useUpdateTimeEntry();
+  const bulkRetry = useBulkRetrySyncFailed();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDuration, setEditDuration] = useState("");
+  const [editComment, setEditComment] = useState("");
+  const [editActivityId, setEditActivityId] = useState<number | undefined>();
+  const [editDate, setEditDate] = useState("");
 
   const isTimerOnThisIssue = activeTimer?.issueId === issueId;
   const isTimerRunning = !!activeTimer;
@@ -206,6 +229,66 @@ export function IssueTimeSection({
     [issueId, deleteEntry],
   );
 
+  const handleStartEdit = useCallback((entry: TimeEntry) => {
+    setEditingId(entry.id);
+    setEditDuration(formatMinutes(entry.duration_minutes));
+    setEditComment(entry.comment || "");
+    setEditActivityId(entry.redmine_activity_id ?? undefined);
+    setEditDate(entry.spent_on);
+  }, []);
+
+  const handleSaveEdit = useCallback(() => {
+    if (!editingId) return;
+    const minutes = parseDuration(editDuration);
+    if (!minutes || minutes <= 0) {
+      toast.error("Enter a valid duration");
+      return;
+    }
+    const activityName = activities.find((a) => a.id === editActivityId)?.name;
+    updateEntry.mutate(
+      {
+        entryId: editingId,
+        issueId,
+        data: {
+          duration_minutes: minutes,
+          redmine_activity_id: editActivityId,
+          activity_name: activityName,
+          comment: editComment,
+          spent_on: editDate,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Time entry updated");
+          setEditingId(null);
+        },
+        onError: () => toast.error("Failed to update time entry"),
+      },
+    );
+  }, [
+    editingId,
+    editDuration,
+    editComment,
+    editActivityId,
+    editDate,
+    activities,
+    issueId,
+    updateEntry,
+  ]);
+
+  const handleBulkRetry = useCallback(() => {
+    bulkRetry.mutate(undefined, {
+      onSuccess: (result) => {
+        toast.success(
+          `Retried ${result.retried}: ${result.succeeded} synced, ${result.failed} still failed`,
+        );
+      },
+      onError: () => toast.error("Bulk retry failed"),
+    });
+  }, [bulkRetry]);
+
+  const failedCount = entries.filter((e) => e.sync_status === "failed").length;
+
   return (
     <div>
       {/* Collapsible header */}
@@ -255,6 +338,42 @@ export function IssueTimeSection({
               Quick log
             </Button>
           </div>
+
+          {/* Budget bar: estimated vs actual */}
+          {estimatedMinutes != null && estimatedMinutes > 0 && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>
+                  {formatMinutes(totalMinutes)} /{" "}
+                  {formatMinutes(estimatedMinutes)}
+                </span>
+                <span>
+                  {Math.round((totalMinutes / estimatedMinutes) * 100)}%
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-300",
+                    totalMinutes / estimatedMinutes > 1
+                      ? "bg-destructive"
+                      : totalMinutes / estimatedMinutes > 0.8
+                        ? "bg-yellow-500"
+                        : "bg-emerald-500",
+                  )}
+                  style={{
+                    width: `${Math.min((totalMinutes / estimatedMinutes) * 100, 100)}%`,
+                  }}
+                />
+              </div>
+              {totalMinutes > estimatedMinutes && (
+                <p className="text-[10px] text-destructive">
+                  Over budget by{" "}
+                  {formatMinutes(totalMinutes - estimatedMinutes)}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Quick log form */}
           {quickLogOpen && (
@@ -319,6 +438,26 @@ export function IssueTimeSection({
             </div>
           )}
 
+          {/* Retry failed button */}
+          {failedCount > 0 && (
+            <Button
+              variant="outline"
+              size="xs"
+              className="w-full text-[11px] text-destructive"
+              onClick={handleBulkRetry}
+              disabled={bulkRetry.isPending}
+            >
+              <RefreshCw
+                className={cn(
+                  "size-3 mr-1",
+                  bulkRetry.isPending && "animate-spin",
+                )}
+              />
+              Retry {failedCount} failed{" "}
+              {failedCount === 1 ? "entry" : "entries"}
+            </Button>
+          )}
+
           {/* Entries list */}
           {entries.length > 0 && (
             <div className="space-y-0.5">
@@ -327,6 +466,87 @@ export function IssueTimeSection({
                   SYNC_ICONS[entry.sync_status] ?? SYNC_ICONS.not_linked!;
                 const SyncIcon = sync.icon;
                 const isOwn = entry.user_id === currentUser?.id;
+                const isEditing = editingId === entry.id;
+
+                if (isEditing) {
+                  return (
+                    <div
+                      key={entry.id}
+                      className="animate-in fade-in-0 duration-150 space-y-1.5 rounded-md border bg-muted/30 p-2 -mx-2"
+                    >
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="Duration"
+                          className="flex-1 rounded-md border bg-background px-2 py-1 text-[11px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          value={editDuration}
+                          onChange={(e) => setEditDuration(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveEdit();
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          autoFocus
+                        />
+                        <input
+                          type="date"
+                          className="w-28 rounded-md border bg-background px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                          value={editDate}
+                          onChange={(e) => setEditDate(e.target.value)}
+                        />
+                      </div>
+                      {activities.length > 0 && (
+                        <select
+                          className="w-full rounded-md border bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                          value={editActivityId ?? ""}
+                          onChange={(e) =>
+                            setEditActivityId(
+                              e.target.value
+                                ? Number(e.target.value)
+                                : undefined,
+                            )
+                          }
+                        >
+                          <option value="">Activity type...</option>
+                          {activities.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <input
+                        type="text"
+                        placeholder="Comment (optional)"
+                        className="w-full rounded-md border bg-background px-2 py-1 text-[11px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        value={editComment}
+                        onChange={(e) => setEditComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveEdit();
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                      />
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="text-[11px]"
+                          onClick={() => setEditingId(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="xs"
+                          className="text-[11px]"
+                          onClick={handleSaveEdit}
+                          disabled={updateEntry.isPending}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={entry.id}
@@ -359,13 +579,22 @@ export function IssueTimeSection({
                         {timeAgo(entry.created_at)}
                       </span>
                       {isOwn && (
-                        <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDelete(entry)}
-                          title="Delete"
-                        >
-                          <Trash2 className="size-3" />
-                        </button>
+                        <>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                            onClick={() => handleStartEdit(entry)}
+                            title="Edit"
+                          >
+                            <Pencil className="size-3" />
+                          </button>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDelete(entry)}
+                            title="Delete"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </>
                       )}
                     </span>
                   </div>

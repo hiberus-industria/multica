@@ -75,7 +75,7 @@ func (q *Queries) DeleteWorkspaceIntegration(ctx context.Context, arg DeleteWork
 }
 
 const getIssueIntegrationLink = `-- name: GetIssueIntegrationLink :one
-SELECT id, workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title, created_at, updated_at FROM issue_integration_link
+SELECT id, workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title, created_at, updated_at, estimated_hours FROM issue_integration_link
 WHERE workspace_id = $1 AND issue_id = $2 AND provider = $3
 `
 
@@ -98,6 +98,7 @@ func (q *Queries) GetIssueIntegrationLink(ctx context.Context, arg GetIssueInteg
 		&i.ExternalIssueTitle,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EstimatedHours,
 	)
 	return i, err
 }
@@ -181,7 +182,7 @@ func (q *Queries) GetWorkspaceIntegration(ctx context.Context, arg GetWorkspaceI
 }
 
 const listIssueIntegrationLinks = `-- name: ListIssueIntegrationLinks :many
-SELECT id, workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title, created_at, updated_at FROM issue_integration_link
+SELECT id, workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title, created_at, updated_at, estimated_hours FROM issue_integration_link
 WHERE workspace_id = $1 AND issue_id = $2
 ORDER BY provider ASC
 `
@@ -210,6 +211,7 @@ func (q *Queries) ListIssueIntegrationLinks(ctx context.Context, arg ListIssueIn
 			&i.ExternalIssueTitle,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EstimatedHours,
 		); err != nil {
 			return nil, err
 		}
@@ -296,23 +298,25 @@ func (q *Queries) ListWorkspaceIntegrations(ctx context.Context, workspaceID pgt
 }
 
 const upsertIssueIntegrationLink = `-- name: UpsertIssueIntegrationLink :one
-INSERT INTO issue_integration_link (workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO issue_integration_link (workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title, estimated_hours)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (workspace_id, issue_id, provider) DO UPDATE SET
     external_issue_id    = EXCLUDED.external_issue_id,
     external_issue_url   = EXCLUDED.external_issue_url,
     external_issue_title = EXCLUDED.external_issue_title,
+    estimated_hours      = EXCLUDED.estimated_hours,
     updated_at           = now()
-RETURNING id, workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title, created_at, updated_at
+RETURNING id, workspace_id, issue_id, provider, external_issue_id, external_issue_url, external_issue_title, created_at, updated_at, estimated_hours
 `
 
 type UpsertIssueIntegrationLinkParams struct {
-	WorkspaceID        pgtype.UUID `json:"workspace_id"`
-	IssueID            pgtype.UUID `json:"issue_id"`
-	Provider           string      `json:"provider"`
-	ExternalIssueID    string      `json:"external_issue_id"`
-	ExternalIssueUrl   pgtype.Text `json:"external_issue_url"`
-	ExternalIssueTitle pgtype.Text `json:"external_issue_title"`
+	WorkspaceID        pgtype.UUID   `json:"workspace_id"`
+	IssueID            pgtype.UUID   `json:"issue_id"`
+	Provider           string        `json:"provider"`
+	ExternalIssueID    string        `json:"external_issue_id"`
+	ExternalIssueUrl   pgtype.Text   `json:"external_issue_url"`
+	ExternalIssueTitle pgtype.Text   `json:"external_issue_title"`
+	EstimatedHours     pgtype.Float8 `json:"estimated_hours"`
 }
 
 func (q *Queries) UpsertIssueIntegrationLink(ctx context.Context, arg UpsertIssueIntegrationLinkParams) (IssueIntegrationLink, error) {
@@ -323,6 +327,7 @@ func (q *Queries) UpsertIssueIntegrationLink(ctx context.Context, arg UpsertIssu
 		arg.ExternalIssueID,
 		arg.ExternalIssueUrl,
 		arg.ExternalIssueTitle,
+		arg.EstimatedHours,
 	)
 	var i IssueIntegrationLink
 	err := row.Scan(
@@ -335,6 +340,7 @@ func (q *Queries) UpsertIssueIntegrationLink(ctx context.Context, arg UpsertIssu
 		&i.ExternalIssueTitle,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EstimatedHours,
 	)
 	return i, err
 }

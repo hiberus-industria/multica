@@ -102,5 +102,6 @@ const (
 
 	// Time entry events
 	EventTimeEntryCreated = "time_entry:created"
+	EventTimeEntryUpdated = "time_entry:updated"
 	EventTimeEntryDeleted = "time_entry:deleted"
 )

@@ -35,10 +35,11 @@ type RedmineProject struct {
 }
 
 type RedmineIssue struct {
-	ID          int        `json:"id"`
-	Subject     string     `json:"subject"`
-	Description string     `json:"description"`
-	Project     RedmineRef `json:"project"`
+	ID             int        `json:"id"`
+	Subject        string     `json:"subject"`
+	Description    string     `json:"description"`
+	Project        RedmineRef `json:"project"`
+	EstimatedHours *float64   `json:"estimated_hours"`
 }
 
 // ---- request types ----
@@ -170,6 +171,34 @@ func (c *RedmineClient) ListIssues(instanceURL, apiKey string, projectID int) ([
 	return body.Issues, nil
 }
 
+// GetIssue fetches a single Redmine issue by ID (includes estimated_hours).
+func (c *RedmineClient) GetIssue(instanceURL, apiKey string, issueID int) (RedmineIssue, error) {
+	url := fmt.Sprintf("%s/issues/%d.json", strings.TrimRight(instanceURL, "/"), issueID)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return RedmineIssue{}, err
+	}
+	req.Header.Set("X-Redmine-API-Key", apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return RedmineIssue{}, fmt.Errorf("redmine request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return RedmineIssue{}, fmt.Errorf("redmine returned status %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Issue RedmineIssue `json:"issue"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return RedmineIssue{}, fmt.Errorf("decoding redmine response: %w", err)
+	}
+	return body.Issue, nil
+}
+
 func (c *RedmineClient) CreateIssue(instanceURL, apiKey string, req CreateRedmineIssueReq) (RedmineIssue, error) {
 	payload := map[string]any{
 		"issue": map[string]any{
@@ -287,6 +316,39 @@ func (c *RedmineClient) DeleteTimeEntry(instanceURL, apiKey string, entryID int)
 	req.Header.Set("X-Redmine-API-Key", apiKey)
 
 	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("redmine request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("redmine returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// UpdateTimeEntry updates an existing Redmine time entry (PUT).
+func (c *RedmineClient) UpdateTimeEntry(instanceURL, apiKey string, entryID int, req CreateRedmineTimeEntryReq) error {
+	entry := map[string]any{
+		"hours":    req.Hours,
+		"comments": req.Comments,
+		"spent_on": req.SpentOn,
+	}
+	if req.ActivityID > 0 {
+		entry["activity_id"] = req.ActivityID
+	}
+	payload := map[string]any{"time_entry": entry}
+	b, _ := json.Marshal(payload)
+
+	url := fmt.Sprintf("%s/time_entries/%d.json", strings.TrimRight(instanceURL, "/"), entryID)
+	httpReq, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(b))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("X-Redmine-API-Key", apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("redmine request failed: %w", err)
 	}

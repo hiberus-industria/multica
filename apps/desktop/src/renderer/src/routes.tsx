@@ -14,6 +14,7 @@ import { IssuesPage } from "@multica/views/issues/components";
 import { ProjectsPage } from "@multica/views/projects/components";
 import { AutopilotsPage } from "@multica/views/autopilots/components";
 import { MyIssuesPage } from "@multica/views/my-issues";
+import { TimeTrackingDashboard } from "@multica/views/time-tracking/dashboard";
 import { SkillsPage } from "@multica/views/skills";
 import { DesktopRuntimesPage } from "./components/desktop-runtimes-page";
 import { AgentsPage } from "@multica/views/agents";
@@ -35,8 +36,9 @@ function TitleSync() {
   const matches = useMatches();
   const title = [...matches]
     .reverse()
-    .find((m) => (m.handle as { title?: string })?.title)
-    ?.handle as { title?: string } | undefined;
+    .find((m) => (m.handle as { title?: string })?.title)?.handle as
+    | { title?: string }
+    | undefined;
 
   useEffect(() => {
     if (title?.title) document.title = title.title;
@@ -82,7 +84,11 @@ export const appRoutes: RouteObject[] = [
         element: <WorkspaceRouteLayout />,
         children: [
           { index: true, element: <Navigate to="issues" replace /> },
-          { path: "issues", element: <IssuesPage />, handle: { title: "Issues" } },
+          {
+            path: "issues",
+            element: <IssuesPage />,
+            handle: { title: "Issues" },
+          },
           {
             path: "issues/:id",
             element: <IssueDetailPage />,
@@ -114,17 +120,30 @@ export const appRoutes: RouteObject[] = [
             handle: { title: "My Issues" },
           },
           {
+            path: "time-tracking",
+            element: <TimeTrackingDashboard />,
+            handle: { title: "Time Tracking" },
+          },
+          {
             path: "runtimes",
             element: <DesktopRuntimesPage />,
             handle: { title: "Runtimes" },
           },
-          { path: "skills", element: <SkillsPage />, handle: { title: "Skills" } },
+          {
+            path: "skills",
+            element: <SkillsPage />,
+            handle: { title: "Skills" },
+          },
           {
             path: "skills/:id",
             element: <SkillDetailPage />,
             handle: { title: "Skill" },
           },
-          { path: "agents", element: <AgentsPage />, handle: { title: "Agents" } },
+          {
+            path: "agents",
+            element: <AgentsPage />,
+            handle: { title: "Agents" },
+          },
           { path: "inbox", element: <InboxPage />, handle: { title: "Inbox" } },
           { path: "chat", element: <ChatPage />, handle: { title: "Chat" } },
           {

@@ -84,6 +84,154 @@ func (q *Queries) DeleteTimeEntry(ctx context.Context, arg DeleteTimeEntryParams
 	return err
 }
 
+const getDailyTimeByUser = `-- name: GetDailyTimeByUser :many
+SELECT spent_on, COALESCE(SUM(duration_minutes), 0)::int AS total_minutes
+FROM time_entry
+WHERE workspace_id = $1 AND user_id = $2
+  AND spent_on >= $3 AND spent_on <= $4
+GROUP BY spent_on
+ORDER BY spent_on
+`
+
+type GetDailyTimeByUserParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	SpentOn     pgtype.Date `json:"spent_on"`
+	SpentOn_2   pgtype.Date `json:"spent_on_2"`
+}
+
+type GetDailyTimeByUserRow struct {
+	SpentOn      pgtype.Date `json:"spent_on"`
+	TotalMinutes int32       `json:"total_minutes"`
+}
+
+func (q *Queries) GetDailyTimeByUser(ctx context.Context, arg GetDailyTimeByUserParams) ([]GetDailyTimeByUserRow, error) {
+	rows, err := q.db.Query(ctx, getDailyTimeByUser,
+		arg.WorkspaceID,
+		arg.UserID,
+		arg.SpentOn,
+		arg.SpentOn_2,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetDailyTimeByUserRow{}
+	for rows.Next() {
+		var i GetDailyTimeByUserRow
+		if err := rows.Scan(&i.SpentOn, &i.TotalMinutes); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTimeByActivity = `-- name: GetTimeByActivity :many
+SELECT COALESCE(activity_name, 'Unspecified') AS activity,
+       COALESCE(SUM(duration_minutes), 0)::int AS total_minutes
+FROM time_entry
+WHERE workspace_id = $1 AND user_id = $2
+  AND spent_on >= $3 AND spent_on <= $4
+GROUP BY activity_name
+ORDER BY total_minutes DESC
+`
+
+type GetTimeByActivityParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	SpentOn     pgtype.Date `json:"spent_on"`
+	SpentOn_2   pgtype.Date `json:"spent_on_2"`
+}
+
+type GetTimeByActivityRow struct {
+	Activity     string `json:"activity"`
+	TotalMinutes int32  `json:"total_minutes"`
+}
+
+func (q *Queries) GetTimeByActivity(ctx context.Context, arg GetTimeByActivityParams) ([]GetTimeByActivityRow, error) {
+	rows, err := q.db.Query(ctx, getTimeByActivity,
+		arg.WorkspaceID,
+		arg.UserID,
+		arg.SpentOn,
+		arg.SpentOn_2,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetTimeByActivityRow{}
+	for rows.Next() {
+		var i GetTimeByActivityRow
+		if err := rows.Scan(&i.Activity, &i.TotalMinutes); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTimeByIssue = `-- name: GetTimeByIssue :many
+SELECT te.issue_id, i.number AS issue_number, i.title AS issue_title,
+       COALESCE(SUM(te.duration_minutes), 0)::int AS total_minutes
+FROM time_entry te
+JOIN issue i ON i.id = te.issue_id
+WHERE te.workspace_id = $1 AND te.user_id = $2
+  AND te.spent_on >= $3 AND te.spent_on <= $4
+GROUP BY te.issue_id, i.number, i.title
+ORDER BY total_minutes DESC
+`
+
+type GetTimeByIssueParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	SpentOn     pgtype.Date `json:"spent_on"`
+	SpentOn_2   pgtype.Date `json:"spent_on_2"`
+}
+
+type GetTimeByIssueRow struct {
+	IssueID      pgtype.UUID `json:"issue_id"`
+	IssueNumber  int32       `json:"issue_number"`
+	IssueTitle   string      `json:"issue_title"`
+	TotalMinutes int32       `json:"total_minutes"`
+}
+
+func (q *Queries) GetTimeByIssue(ctx context.Context, arg GetTimeByIssueParams) ([]GetTimeByIssueRow, error) {
+	rows, err := q.db.Query(ctx, getTimeByIssue,
+		arg.WorkspaceID,
+		arg.UserID,
+		arg.SpentOn,
+		arg.SpentOn_2,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetTimeByIssueRow{}
+	for rows.Next() {
+		var i GetTimeByIssueRow
+		if err := rows.Scan(
+			&i.IssueID,
+			&i.IssueNumber,
+			&i.IssueTitle,
+			&i.TotalMinutes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTimeEntry = `-- name: GetTimeEntry :one
 SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at FROM time_entry
 WHERE id = $1 AND workspace_id = $2
@@ -133,6 +281,48 @@ func (q *Queries) GetTotalTimeByIssue(ctx context.Context, arg GetTotalTimeByIss
 	var total_minutes int32
 	err := row.Scan(&total_minutes)
 	return total_minutes, err
+}
+
+const listFailedTimeEntries = `-- name: ListFailedTimeEntries :many
+SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at FROM time_entry
+WHERE workspace_id = $1 AND sync_status = 'failed'
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListFailedTimeEntries(ctx context.Context, workspaceID pgtype.UUID) ([]TimeEntry, error) {
+	rows, err := q.db.Query(ctx, listFailedTimeEntries, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TimeEntry{}
+	for rows.Next() {
+		var i TimeEntry
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.IssueID,
+			&i.UserID,
+			&i.DurationMinutes,
+			&i.ActivityName,
+			&i.RedmineActivityID,
+			&i.Comment,
+			&i.SpentOn,
+			&i.ExternalTimeEntryID,
+			&i.SyncStatus,
+			&i.TimerStartedAt,
+			&i.TimerStoppedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTimeEntriesByIssue = `-- name: ListTimeEntriesByIssue :many
@@ -235,6 +425,138 @@ func (q *Queries) ListTimeEntriesByUser(ctx context.Context, arg ListTimeEntries
 		return nil, err
 	}
 	return items, nil
+}
+
+const listTimeEntriesByUserDateRange = `-- name: ListTimeEntriesByUserDateRange :many
+SELECT te.id, te.workspace_id, te.issue_id, te.user_id, te.duration_minutes, te.activity_name, te.redmine_activity_id, te.comment, te.spent_on, te.external_time_entry_id, te.sync_status, te.timer_started_at, te.timer_stopped_at, te.created_at, te.updated_at, i.number AS issue_number, i.title AS issue_title
+FROM time_entry te
+JOIN issue i ON i.id = te.issue_id
+WHERE te.workspace_id = $1 AND te.user_id = $2
+  AND te.spent_on >= $3 AND te.spent_on <= $4
+ORDER BY te.spent_on DESC, te.created_at DESC
+`
+
+type ListTimeEntriesByUserDateRangeParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	UserID      pgtype.UUID `json:"user_id"`
+	SpentOn     pgtype.Date `json:"spent_on"`
+	SpentOn_2   pgtype.Date `json:"spent_on_2"`
+}
+
+type ListTimeEntriesByUserDateRangeRow struct {
+	ID                  pgtype.UUID        `json:"id"`
+	WorkspaceID         pgtype.UUID        `json:"workspace_id"`
+	IssueID             pgtype.UUID        `json:"issue_id"`
+	UserID              pgtype.UUID        `json:"user_id"`
+	DurationMinutes     int32              `json:"duration_minutes"`
+	ActivityName        pgtype.Text        `json:"activity_name"`
+	RedmineActivityID   pgtype.Int4        `json:"redmine_activity_id"`
+	Comment             string             `json:"comment"`
+	SpentOn             pgtype.Date        `json:"spent_on"`
+	ExternalTimeEntryID pgtype.Text        `json:"external_time_entry_id"`
+	SyncStatus          string             `json:"sync_status"`
+	TimerStartedAt      pgtype.Timestamptz `json:"timer_started_at"`
+	TimerStoppedAt      pgtype.Timestamptz `json:"timer_stopped_at"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	IssueNumber         int32              `json:"issue_number"`
+	IssueTitle          string             `json:"issue_title"`
+}
+
+func (q *Queries) ListTimeEntriesByUserDateRange(ctx context.Context, arg ListTimeEntriesByUserDateRangeParams) ([]ListTimeEntriesByUserDateRangeRow, error) {
+	rows, err := q.db.Query(ctx, listTimeEntriesByUserDateRange,
+		arg.WorkspaceID,
+		arg.UserID,
+		arg.SpentOn,
+		arg.SpentOn_2,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTimeEntriesByUserDateRangeRow{}
+	for rows.Next() {
+		var i ListTimeEntriesByUserDateRangeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.IssueID,
+			&i.UserID,
+			&i.DurationMinutes,
+			&i.ActivityName,
+			&i.RedmineActivityID,
+			&i.Comment,
+			&i.SpentOn,
+			&i.ExternalTimeEntryID,
+			&i.SyncStatus,
+			&i.TimerStartedAt,
+			&i.TimerStoppedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IssueNumber,
+			&i.IssueTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateTimeEntry = `-- name: UpdateTimeEntry :one
+UPDATE time_entry
+SET duration_minutes    = $3,
+    activity_name       = $4,
+    redmine_activity_id = $5,
+    comment             = $6,
+    spent_on            = $7,
+    updated_at          = now()
+WHERE id = $1 AND workspace_id = $2
+RETURNING id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at
+`
+
+type UpdateTimeEntryParams struct {
+	ID                pgtype.UUID `json:"id"`
+	WorkspaceID       pgtype.UUID `json:"workspace_id"`
+	DurationMinutes   int32       `json:"duration_minutes"`
+	ActivityName      pgtype.Text `json:"activity_name"`
+	RedmineActivityID pgtype.Int4 `json:"redmine_activity_id"`
+	Comment           string      `json:"comment"`
+	SpentOn           pgtype.Date `json:"spent_on"`
+}
+
+func (q *Queries) UpdateTimeEntry(ctx context.Context, arg UpdateTimeEntryParams) (TimeEntry, error) {
+	row := q.db.QueryRow(ctx, updateTimeEntry,
+		arg.ID,
+		arg.WorkspaceID,
+		arg.DurationMinutes,
+		arg.ActivityName,
+		arg.RedmineActivityID,
+		arg.Comment,
+		arg.SpentOn,
+	)
+	var i TimeEntry
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.UserID,
+		&i.DurationMinutes,
+		&i.ActivityName,
+		&i.RedmineActivityID,
+		&i.Comment,
+		&i.SpentOn,
+		&i.ExternalTimeEntryID,
+		&i.SyncStatus,
+		&i.TimerStartedAt,
+		&i.TimerStoppedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateTimeEntrySyncStatus = `-- name: UpdateTimeEntrySyncStatus :exec

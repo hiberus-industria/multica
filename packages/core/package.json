@@ -77,7 +77,8 @@
     "./time-entries": "./time-entries/index.ts",
     "./time-entries/queries": "./time-entries/queries.ts",
     "./time-entries/mutations": "./time-entries/mutations.ts",
-    "./time-entries/timer-store": "./time-entries/timer-store.ts"
+    "./time-entries/timer-store": "./time-entries/timer-store.ts",
+    "./time-entries/idle-store": "./time-entries/idle-store.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "catalog:",

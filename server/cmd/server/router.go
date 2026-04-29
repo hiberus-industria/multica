@@ -295,8 +295,11 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus, analytics
 				})
 			})
 
-			// Time entry delete (standalone route so we don't need issueId in URL)
+			// Time entry standalone routes (don't need issueId in URL)
 			r.Delete("/api/time-entries/{id}", h.DeleteTimeEntry)
+			r.Put("/api/time-entries/{id}", h.UpdateTimeEntry)
+			r.Post("/api/time-entries/bulk-retry", h.BulkRetrySyncFailed)
+			r.Get("/api/time-tracking/dashboard", h.TimeTrackingDashboard)
 
 			// Task messages (user-facing, not daemon auth)
 			r.Get("/api/tasks/{taskId}/messages", h.ListTaskMessagesByUser)

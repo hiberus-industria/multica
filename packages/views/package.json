@@ -42,7 +42,10 @@
     "./platform": "./platform/index.ts",
     "./time-tracking/floating-timer": "./time-tracking/floating-timer.tsx",
     "./time-tracking/timer-play-button": "./time-tracking/timer-play-button.tsx",
-    "./time-tracking/sidebar-timer-indicator": "./time-tracking/sidebar-timer-indicator.tsx"
+    "./time-tracking/sidebar-timer-indicator": "./time-tracking/sidebar-timer-indicator.tsx",
+    "./time-tracking/idle-detector": "./time-tracking/idle-detector.tsx",
+    "./time-tracking/use-timer-auto-suggest": "./time-tracking/use-timer-auto-suggest.ts",
+    "./time-tracking/dashboard": "./time-tracking/dashboard.tsx"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

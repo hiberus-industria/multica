@@ -107,6 +107,7 @@ import { cn } from "@multica/ui/lib/utils";
 import { ProgressRing } from "./progress-ring";
 import { IssueRedmineSection } from "./issue-redmine-section";
 import { IssueTimeSection } from "./issue-time-section";
+import { useTimerAutoSuggest } from "../../time-tracking/use-timer-auto-suggest";
 
 function shortDate(date: string | null): string {
   if (!date) return "—";
@@ -304,6 +305,9 @@ export function IssueDetail({
       recordVisit(issue.id);
     }
   }, [issue?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-suggest timer when status transitions to in_progress
+  useTimerAutoSuggest(issue ?? undefined);
 
   // Fire `onDelete` once when the issue transitions from loaded to missing.
   // Delete goes through a shell-level modal, so the caller (e.g. inbox) can't

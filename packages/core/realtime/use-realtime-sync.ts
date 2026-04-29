@@ -187,6 +187,7 @@ export function useRealtimeSync(
       "subscriber:removed",
       "daemon:heartbeat",
       "time_entry:created",
+      "time_entry:updated",
       "time_entry:deleted",
       // Chat / task events are handled explicitly below; do not double-invalidate.
       "chat:message",
@@ -331,6 +332,16 @@ export function useRealtimeSync(
     });
 
     const unsubTimeEntryDeleted = ws.on("time_entry:deleted", (p) => {
+      const { issue_id } = p as { issue_id: string };
+      const wsId = getCurrentWsId();
+      if (issue_id && wsId) {
+        qc.invalidateQueries({
+          queryKey: timeEntryKeys.issueEntries(wsId, issue_id),
+        });
+      }
+    });
+
+    const unsubTimeEntryUpdated = ws.on("time_entry:updated", (p) => {
       const { issue_id } = p as { issue_id: string };
       const wsId = getCurrentWsId();
       if (issue_id && wsId) {
@@ -568,6 +579,7 @@ export function useRealtimeSync(
       unsubSubscriberRemoved();
       unsubTimeEntryCreated();
       unsubTimeEntryDeleted();
+      unsubTimeEntryUpdated();
       unsubWsDeleted();
       unsubMemberRemoved();
       unsubMemberAdded();

@@ -6,6 +6,8 @@ export const timeEntryKeys = {
     ["time-entries", wsId, "issue", issueId] as const,
   redmineActivities: (wsId: string) =>
     ["time-entries", wsId, "redmine-activities"] as const,
+  dashboard: (wsId: string, start: string, end: string) =>
+    ["time-entries", wsId, "dashboard", start, end] as const,
 };
 
 export function issueTimeEntriesOptions(wsId: string, issueId: string) {
@@ -22,5 +24,13 @@ export function redmineActivitiesOptions(wsId: string) {
     queryFn: () => api.listRedmineActivities(),
     enabled: !!wsId,
     staleTime: 1000 * 60 * 30, // activities rarely change — 30 min
+  });
+}
+
+export function dashboardOptions(wsId: string, start: string, end: string) {
+  return queryOptions({
+    queryKey: timeEntryKeys.dashboard(wsId, start, end),
+    queryFn: () => api.getTimeTrackingDashboard(start, end),
+    enabled: !!wsId,
   });
 }

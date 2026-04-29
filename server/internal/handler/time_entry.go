@@ -402,3 +402,344 @@ func (h *Handler) ListRedmineActivities(w http.ResponseWriter, r *http.Request) 
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"activities": activities})
 }
+
+// UpdateTimeEntry updates a time entry (own entries only) and re-syncs to Redmine if synced.
+func (h *Handler) UpdateTimeEntry(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := h.resolveWorkspaceID(r)
+	entryID := chi.URLParam(r, "id")
+
+	entry, err := h.Queries.GetTimeEntry(r.Context(), db.GetTimeEntryParams{
+		ID:          parseUUID(entryID),
+		WorkspaceID: parseUUID(workspaceID),
+	})
+	if err != nil {
+		writeError(w, http.StatusNotFound, "time entry not found")
+		return
+	}
+	if uuidToString(entry.UserID) != userID {
+		writeError(w, http.StatusForbidden, "can only edit your own time entries")
+		return
+	}
+
+	var req struct {
+		DurationMinutes   *int32  `json:"duration_minutes"`
+		RedmineActivityID *int32  `json:"redmine_activity_id"`
+		ActivityName      *string `json:"activity_name"`
+		Comment           *string `json:"comment"`
+		SpentOn           *string `json:"spent_on"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Apply defaults from existing entry
+	dur := entry.DurationMinutes
+	if req.DurationMinutes != nil {
+		if *req.DurationMinutes <= 0 {
+			writeError(w, http.StatusBadRequest, "duration_minutes must be positive")
+			return
+		}
+		dur = *req.DurationMinutes
+	}
+
+	activityName := entry.ActivityName
+	if req.ActivityName != nil {
+		activityName = strToText(*req.ActivityName)
+	}
+	activityID := entry.RedmineActivityID
+	if req.RedmineActivityID != nil {
+		activityID = pgtype.Int4{Int32: *req.RedmineActivityID, Valid: true}
+	}
+	comment := entry.Comment
+	if req.Comment != nil {
+		comment = *req.Comment
+	}
+	spentOn := entry.SpentOn
+	if req.SpentOn != nil && *req.SpentOn != "" {
+		t, err := time.Parse("2006-01-02", *req.SpentOn)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid spent_on date format")
+			return
+		}
+		spentOn = pgtype.Date{Time: t, Valid: true}
+	}
+
+	updated, err := h.Queries.UpdateTimeEntry(r.Context(), db.UpdateTimeEntryParams{
+		ID:                parseUUID(entryID),
+		WorkspaceID:       parseUUID(workspaceID),
+		DurationMinutes:   dur,
+		ActivityName:      activityName,
+		RedmineActivityID: activityID,
+		Comment:           comment,
+		SpentOn:           spentOn,
+	})
+	if err != nil {
+		slog.Error("failed to update time entry", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to update time entry")
+		return
+	}
+
+	// If synced to Redmine, update there too
+	if updated.SyncStatus == "synced" && updated.ExternalTimeEntryID.Valid {
+		h.tryUpdateRedmineTimeEntry(r, workspaceID, userID, updated)
+	}
+
+	resp := timeEntryToResponse(updated)
+	issueID := uuidToString(updated.IssueID)
+
+	h.publish(protocol.EventTimeEntryCreated, workspaceID, "member", userID, map[string]any{
+		"issue_id":   issueID,
+		"time_entry": resp,
+	})
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// tryUpdateRedmineTimeEntry pushes updated fields to Redmine. Best-effort.
+func (h *Handler) tryUpdateRedmineTimeEntry(r *http.Request, workspaceID, userID string, entry db.TimeEntry) {
+	integration, err := h.Queries.GetWorkspaceIntegration(r.Context(), db.GetWorkspaceIntegrationParams{
+		WorkspaceID: parseUUID(workspaceID),
+		Provider:    "redmine",
+	})
+	if err != nil {
+		return
+	}
+	cred, err := h.Queries.GetUserIntegrationCredential(r.Context(), db.GetUserIntegrationCredentialParams{
+		WorkspaceID: parseUUID(workspaceID),
+		UserID:      parseUUID(userID),
+		Provider:    "redmine",
+	})
+	if err != nil {
+		return
+	}
+
+	externalID, err := strconv.Atoi(entry.ExternalTimeEntryID.String)
+	if err != nil {
+		return
+	}
+
+	hours := float64(entry.DurationMinutes) / 60.0
+	spentOn := ""
+	if entry.SpentOn.Valid {
+		spentOn = entry.SpentOn.Time.Format("2006-01-02")
+	}
+	var activityID int
+	if entry.RedmineActivityID.Valid {
+		activityID = int(entry.RedmineActivityID.Int32)
+	}
+
+	if err := h.RedmineClient.UpdateTimeEntry(integration.InstanceUrl, cred.ApiKey, externalID, service.CreateRedmineTimeEntryReq{
+		Hours:      hours,
+		ActivityID: activityID,
+		Comments:   entry.Comment,
+		SpentOn:    spentOn,
+	}); err != nil {
+		slog.Error("failed to update time entry in Redmine", "external_id", externalID, "error", err)
+	}
+}
+
+// BulkRetrySyncFailed retries syncing all failed time entries for the current user.
+func (h *Handler) BulkRetrySyncFailed(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := h.resolveWorkspaceID(r)
+
+	entries, err := h.Queries.ListFailedTimeEntries(r.Context(), parseUUID(workspaceID))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list failed entries")
+		return
+	}
+
+	retried := 0
+	succeeded := 0
+	for _, entry := range entries {
+		if uuidToString(entry.UserID) != userID {
+			continue
+		}
+		retried++
+		issueID := uuidToString(entry.IssueID)
+
+		// Reset to pending, then attempt sync
+		h.Queries.UpdateTimeEntrySyncStatus(r.Context(), db.UpdateTimeEntrySyncStatusParams{
+			ID:                  entry.ID,
+			WorkspaceID:         entry.WorkspaceID,
+			ExternalTimeEntryID: pgtype.Text{},
+			SyncStatus:          "pending",
+		})
+
+		h.syncTimeEntryToRedmine(r, workspaceID, userID, issueID, entry)
+
+		// Re-read to check if it succeeded
+		updated, err := h.Queries.GetTimeEntry(r.Context(), db.GetTimeEntryParams{
+			ID:          entry.ID,
+			WorkspaceID: entry.WorkspaceID,
+		})
+		if err == nil && updated.SyncStatus == "synced" {
+			succeeded++
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"retried":   retried,
+		"succeeded": succeeded,
+		"failed":    retried - succeeded,
+	})
+}
+
+// TimeTrackingDashboard returns aggregated time tracking data for the current user.
+func (h *Handler) TimeTrackingDashboard(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := h.resolveWorkspaceID(r)
+
+	// Parse date range from query params
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+
+	var startDate, endDate pgtype.Date
+	if startStr != "" {
+		t, err := time.Parse("2006-01-02", startStr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid start date")
+			return
+		}
+		startDate = pgtype.Date{Time: t, Valid: true}
+	} else {
+		// Default: start of current week (Monday)
+		now := time.Now()
+		weekday := int(now.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		monday := now.AddDate(0, 0, -(weekday - 1))
+		startDate = pgtype.Date{Time: monday, Valid: true}
+	}
+	if endStr != "" {
+		t, err := time.Parse("2006-01-02", endStr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid end date")
+			return
+		}
+		endDate = pgtype.Date{Time: t, Valid: true}
+	} else {
+		endDate = pgtype.Date{Time: time.Now(), Valid: true}
+	}
+
+	// Daily breakdown
+	daily, err := h.Queries.GetDailyTimeByUser(r.Context(), db.GetDailyTimeByUserParams{
+		WorkspaceID: parseUUID(workspaceID),
+		UserID:      parseUUID(userID),
+		SpentOn:     startDate,
+		SpentOn_2:   endDate,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get daily time")
+		return
+	}
+
+	// By activity
+	byActivity, err := h.Queries.GetTimeByActivity(r.Context(), db.GetTimeByActivityParams{
+		WorkspaceID: parseUUID(workspaceID),
+		UserID:      parseUUID(userID),
+		SpentOn:     startDate,
+		SpentOn_2:   endDate,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get time by activity")
+		return
+	}
+
+	// By issue
+	byIssue, err := h.Queries.GetTimeByIssue(r.Context(), db.GetTimeByIssueParams{
+		WorkspaceID: parseUUID(workspaceID),
+		UserID:      parseUUID(userID),
+		SpentOn:     startDate,
+		SpentOn_2:   endDate,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get time by issue")
+		return
+	}
+
+	// Entries with issue info
+	entries, err := h.Queries.ListTimeEntriesByUserDateRange(r.Context(), db.ListTimeEntriesByUserDateRangeParams{
+		WorkspaceID: parseUUID(workspaceID),
+		UserID:      parseUUID(userID),
+		SpentOn:     startDate,
+		SpentOn_2:   endDate,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list entries")
+		return
+	}
+
+	// Format responses
+	dailyResp := make([]map[string]any, len(daily))
+	for i, d := range daily {
+		day := ""
+		if d.SpentOn.Valid {
+			day = d.SpentOn.Time.Format("2006-01-02")
+		}
+		dailyResp[i] = map[string]any{"date": day, "total_minutes": d.TotalMinutes}
+	}
+
+	activityResp := make([]map[string]any, len(byActivity))
+	for i, a := range byActivity {
+		activityResp[i] = map[string]any{"activity": a.Activity, "total_minutes": a.TotalMinutes}
+	}
+
+	issueResp := make([]map[string]any, len(byIssue))
+	for i, iss := range byIssue {
+		issueResp[i] = map[string]any{
+			"issue_id":      uuidToString(iss.IssueID),
+			"issue_number":  iss.IssueNumber,
+			"issue_title":   iss.IssueTitle,
+			"total_minutes": iss.TotalMinutes,
+		}
+	}
+
+	entryResp := make([]map[string]any, len(entries))
+	for i, e := range entries {
+		spentOn := ""
+		if e.SpentOn.Valid {
+			spentOn = e.SpentOn.Time.Format("2006-01-02")
+		}
+		entryResp[i] = map[string]any{
+			"id":               uuidToString(e.ID),
+			"issue_id":         uuidToString(e.IssueID),
+			"issue_number":     e.IssueNumber,
+			"issue_title":      e.IssueTitle,
+			"duration_minutes": e.DurationMinutes,
+			"activity_name":    textToPtr(e.ActivityName),
+			"comment":          e.Comment,
+			"spent_on":         spentOn,
+			"sync_status":      e.SyncStatus,
+			"created_at":       timestampToString(e.CreatedAt),
+		}
+	}
+
+	// Total for range
+	var totalMinutes int32
+	for _, d := range daily {
+		totalMinutes += d.TotalMinutes
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"start_date":    startDate.Time.Format("2006-01-02"),
+		"end_date":      endDate.Time.Format("2006-01-02"),
+		"total_minutes": totalMinutes,
+		"daily":         dailyResp,
+		"by_activity":   activityResp,
+		"by_issue":      issueResp,
+		"entries":       entryResp,
+	})
+}

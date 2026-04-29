@@ -14,6 +14,7 @@ import { AppSidebar } from "@multica/views/layout";
 import { SearchCommand, SearchTrigger } from "@multica/views/search";
 import { StarterContentPrompt } from "@multica/views/onboarding";
 import { FloatingTimer } from "@multica/views/time-tracking/floating-timer";
+import { IdleDetector } from "@multica/views/time-tracking/idle-detector";
 import { WorkspaceSlugProvider } from "@multica/core/paths";
 import { getCurrentSlug, subscribeToCurrentSlug } from "@multica/core/platform";
 import { DesktopNavigationProvider } from "@/platform/navigation";
@@ -144,6 +145,7 @@ export function DesktopShell() {
         {slug && <SearchCommand />}
         {slug && <StarterContentPrompt />}
         {slug && <FloatingTimer />}
+        {slug && <IdleDetector />}
         <WindowOverlay />
       </WorkspaceSlugProvider>
     </DesktopNavigationProvider>

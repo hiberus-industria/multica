@@ -119,5 +119,9 @@ export type {
   TimeEntrySyncStatus,
   RedmineActivity,
   CreateTimeEntryRequest,
+  UpdateTimeEntryRequest,
   ListTimeEntriesResponse,
+  BulkRetryResponse,
+  DashboardEntry,
+  DashboardResponse,
 } from "./time-entry";

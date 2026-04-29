@@ -80,7 +80,10 @@ import type {
   IntegrationProvider,
   TimeEntry,
   CreateTimeEntryRequest,
+  UpdateTimeEntryRequest,
   ListTimeEntriesResponse,
+  BulkRetryResponse,
+  DashboardResponse,
   RedmineActivity,
 } from "../types";
 import type { OnboardingCompletionPath } from "../onboarding/types";
@@ -1447,6 +1450,31 @@ export class ApiClient {
 
   async deleteTimeEntry(entryId: string): Promise<void> {
     await this.fetch(`/api/time-entries/${entryId}`, { method: "DELETE" });
+  }
+
+  async updateTimeEntry(
+    entryId: string,
+    data: UpdateTimeEntryRequest,
+  ): Promise<TimeEntry> {
+    return this.fetch(`/api/time-entries/${entryId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async bulkRetrySyncFailed(): Promise<BulkRetryResponse> {
+    return this.fetch("/api/time-entries/bulk-retry", { method: "POST" });
+  }
+
+  async getTimeTrackingDashboard(
+    start?: string,
+    end?: string,
+  ): Promise<DashboardResponse> {
+    const params = new URLSearchParams();
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    const qs = params.toString();
+    return this.fetch(`/api/time-tracking/dashboard${qs ? `?${qs}` : ""}`);
   }
 
   // ---- Redmine activities ----
