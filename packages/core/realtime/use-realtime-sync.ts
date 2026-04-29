@@ -26,10 +26,16 @@ import {
   onIssueDeleted,
   onIssueLabelsChanged,
 } from "../issues/ws-updaters";
-import { onInboxNew, onInboxInvalidate, onInboxIssueStatusChanged, onInboxIssueDeleted } from "../inbox/ws-updaters";
+import {
+  onInboxNew,
+  onInboxInvalidate,
+  onInboxIssueStatusChanged,
+  onInboxIssueDeleted,
+} from "../inbox/ws-updaters";
 import { inboxKeys } from "../inbox/queries";
 import { workspaceKeys, workspaceListOptions } from "../workspace/queries";
 import { chatKeys } from "../chat/queries";
+import { timeEntryKeys } from "../time-entries/queries";
 import { resolvePostAuthDestination, useHasOnboarded } from "../paths";
 import type {
   MemberAddedPayload,
@@ -112,18 +118,21 @@ export function useRealtimeSync(
       },
       agent: () => {
         const wsId = getCurrentWsId();
-        if (wsId) qc.invalidateQueries({ queryKey: workspaceKeys.agents(wsId) });
+        if (wsId)
+          qc.invalidateQueries({ queryKey: workspaceKeys.agents(wsId) });
       },
       member: () => {
         const wsId = getCurrentWsId();
-        if (wsId) qc.invalidateQueries({ queryKey: workspaceKeys.members(wsId) });
+        if (wsId)
+          qc.invalidateQueries({ queryKey: workspaceKeys.members(wsId) });
       },
       workspace: () => {
         qc.invalidateQueries({ queryKey: workspaceKeys.list() });
       },
       skill: () => {
         const wsId = getCurrentWsId();
-        if (wsId) qc.invalidateQueries({ queryKey: workspaceKeys.skills(wsId) });
+        if (wsId)
+          qc.invalidateQueries({ queryKey: workspaceKeys.skills(wsId) });
       },
       project: () => {
         const wsId = getCurrentWsId();
@@ -143,7 +152,8 @@ export function useRealtimeSync(
       pin: () => {
         const wsId = getCurrentWsId();
         const userId = authStore.getState().user?.id;
-        if (wsId && userId) qc.invalidateQueries({ queryKey: pinKeys.all(wsId, userId) });
+        if (wsId && userId)
+          qc.invalidateQueries({ queryKey: pinKeys.all(wsId, userId) });
       },
       daemon: () => {
         const wsId = getCurrentWsId();
@@ -198,15 +208,29 @@ export function useRealtimeSync(
 
     // Event types handled by specific handlers below -- skip generic refresh
     const specificEvents = new Set([
-      "issue:updated", "issue:created", "issue:deleted", "issue_labels:changed", "inbox:new",
-      "comment:created", "comment:updated", "comment:deleted",
+      "issue:updated",
+      "issue:created",
+      "issue:deleted",
+      "issue_labels:changed",
+      "inbox:new",
+      "comment:created",
+      "comment:updated",
+      "comment:deleted",
       "activity:created",
-      "reaction:added", "reaction:removed",
-      "issue_reaction:added", "issue_reaction:removed",
-      "subscriber:added", "subscriber:removed",
+      "reaction:added",
+      "reaction:removed",
+      "issue_reaction:added",
+      "issue_reaction:removed",
+      "subscriber:added",
+      "subscriber:removed",
       "daemon:heartbeat",
+      "time_entry:created",
+      "time_entry:updated",
+      "time_entry:deleted",
       // Chat events are handled explicitly below; do not double-invalidate.
-      "chat:message", "chat:done", "chat:session_read",
+      "chat:message",
+      "chat:done",
+      "chat:session_read",
       // task:message stays out of the prefix path because it fires per
       // streamed message during a long run — invalidating the snapshot on
       // every message would flood the network. Specific chat handlers below
@@ -353,22 +377,58 @@ export function useRealtimeSync(
 
     const unsubIssueReactionAdded = ws.on("issue_reaction:added", (p) => {
       const { issue_id } = p as IssueReactionAddedPayload;
-      if (issue_id) qc.invalidateQueries({ queryKey: issueKeys.reactions(issue_id) });
+      if (issue_id)
+        qc.invalidateQueries({ queryKey: issueKeys.reactions(issue_id) });
     });
 
     const unsubIssueReactionRemoved = ws.on("issue_reaction:removed", (p) => {
       const { issue_id } = p as IssueReactionRemovedPayload;
-      if (issue_id) qc.invalidateQueries({ queryKey: issueKeys.reactions(issue_id) });
+      if (issue_id)
+        qc.invalidateQueries({ queryKey: issueKeys.reactions(issue_id) });
     });
 
     const unsubSubscriberAdded = ws.on("subscriber:added", (p) => {
       const { issue_id } = p as SubscriberAddedPayload;
-      if (issue_id) qc.invalidateQueries({ queryKey: issueKeys.subscribers(issue_id) });
+      if (issue_id)
+        qc.invalidateQueries({ queryKey: issueKeys.subscribers(issue_id) });
     });
 
     const unsubSubscriberRemoved = ws.on("subscriber:removed", (p) => {
       const { issue_id } = p as SubscriberRemovedPayload;
-      if (issue_id) qc.invalidateQueries({ queryKey: issueKeys.subscribers(issue_id) });
+      if (issue_id)
+        qc.invalidateQueries({ queryKey: issueKeys.subscribers(issue_id) });
+    });
+
+    // --- Time entry events (invalidate time-entry list for the issue) ---
+
+    const unsubTimeEntryCreated = ws.on("time_entry:created", (p) => {
+      const { issue_id } = p as { issue_id: string };
+      const wsId = getCurrentWsId();
+      if (issue_id && wsId) {
+        qc.invalidateQueries({
+          queryKey: timeEntryKeys.issueEntries(wsId, issue_id),
+        });
+      }
+    });
+
+    const unsubTimeEntryDeleted = ws.on("time_entry:deleted", (p) => {
+      const { issue_id } = p as { issue_id: string };
+      const wsId = getCurrentWsId();
+      if (issue_id && wsId) {
+        qc.invalidateQueries({
+          queryKey: timeEntryKeys.issueEntries(wsId, issue_id),
+        });
+      }
+    });
+
+    const unsubTimeEntryUpdated = ws.on("time_entry:updated", (p) => {
+      const { issue_id } = p as { issue_id: string };
+      const wsId = getCurrentWsId();
+      if (issue_id && wsId) {
+        qc.invalidateQueries({
+          queryKey: timeEntryKeys.issueEntries(wsId, issue_id),
+        });
+      }
     });
 
     // --- Side-effect handlers (toast, navigation) ---
@@ -398,7 +458,9 @@ export function useRealtimeSync(
       const { workspace_id } = p as WorkspaceDeletedPayload;
       // Event payload has UUID; look up slug from cached workspace list
       // since clearWorkspaceStorage keys are namespaced by slug.
-      const wsList = qc.getQueryData<{ id: string; slug: string }[]>(workspaceKeys.list()) ?? [];
+      const wsList =
+        qc.getQueryData<{ id: string; slug: string }[]>(workspaceKeys.list()) ??
+        [];
       const deletedSlug = wsList.find((w) => w.id === workspace_id)?.slug;
       if (deletedSlug) clearWorkspaceStorage(defaultStorage, deletedSlug);
       if (getCurrentWsId() === workspace_id) {
@@ -429,10 +491,7 @@ export function useRealtimeSync(
       if (member.user_id === myUserId) {
         qc.invalidateQueries({ queryKey: workspaceKeys.list() });
         qc.invalidateQueries({ queryKey: workspaceKeys.myInvitations() });
-        onToast?.(
-          `You joined ${workspace_name ?? "a workspace"}`,
-          "info",
-        );
+        onToast?.(`You joined ${workspace_name ?? "a workspace"}`, "info");
       }
     });
 
@@ -450,14 +509,18 @@ export function useRealtimeSync(
     const unsubInvitationAccepted = ws.on("invitation:accepted", () => {
       const currentWsId = getCurrentWsId();
       if (currentWsId) {
-        qc.invalidateQueries({ queryKey: workspaceKeys.invitations(currentWsId) });
+        qc.invalidateQueries({
+          queryKey: workspaceKeys.invitations(currentWsId),
+        });
         qc.invalidateQueries({ queryKey: workspaceKeys.members(currentWsId) });
       }
     });
     const unsubInvitationDeclined = ws.on("invitation:declined", () => {
       const currentWsId = getCurrentWsId();
       if (currentWsId) {
-        qc.invalidateQueries({ queryKey: workspaceKeys.invitations(currentWsId) });
+        qc.invalidateQueries({
+          queryKey: workspaceKeys.invitations(currentWsId),
+        });
       }
     });
     const unsubInvitationRevoked = ws.on("invitation:revoked", () => {
@@ -506,9 +569,15 @@ export function useRealtimeSync(
 
     const unsubChatMessage = ws.on("chat:message", (p) => {
       const payload = p as { chat_session_id: string };
-      chatWsLogger.info("chat:message (global)", { chat_session_id: payload.chat_session_id });
-      qc.invalidateQueries({ queryKey: chatKeys.messages(payload.chat_session_id) });
-      qc.invalidateQueries({ queryKey: chatKeys.pendingTask(payload.chat_session_id) });
+      chatWsLogger.info("chat:message (global)", {
+        chat_session_id: payload.chat_session_id,
+      });
+      qc.invalidateQueries({
+        queryKey: chatKeys.messages(payload.chat_session_id),
+      });
+      qc.invalidateQueries({
+        queryKey: chatKeys.pendingTask(payload.chat_session_id),
+      });
       invalidatePendingAggregate();
     });
 
@@ -522,8 +591,12 @@ export function useRealtimeSync(
       // Clear pending-task cache immediately so the live-timeline-vs-assistant
       // race window collapses to zero — the subsequent refetch will confirm.
       qc.setQueryData(chatKeys.pendingTask(payload.chat_session_id), {});
-      qc.invalidateQueries({ queryKey: chatKeys.messages(payload.chat_session_id) });
-      qc.invalidateQueries({ queryKey: chatKeys.pendingTask(payload.chat_session_id) });
+      qc.invalidateQueries({
+        queryKey: chatKeys.messages(payload.chat_session_id),
+      });
+      qc.invalidateQueries({
+        queryKey: chatKeys.pendingTask(payload.chat_session_id),
+      });
       invalidatePendingAggregate();
       // Assistant message just landed → has_unread may have flipped to true.
       invalidateSessionLists();
@@ -595,8 +668,12 @@ export function useRealtimeSync(
         chat_session_id: payload.chat_session_id,
       });
       qc.setQueryData(chatKeys.pendingTask(payload.chat_session_id), {});
-      qc.invalidateQueries({ queryKey: chatKeys.messages(payload.chat_session_id) });
-      qc.invalidateQueries({ queryKey: chatKeys.pendingTask(payload.chat_session_id) });
+      qc.invalidateQueries({
+        queryKey: chatKeys.messages(payload.chat_session_id),
+      });
+      qc.invalidateQueries({
+        queryKey: chatKeys.pendingTask(payload.chat_session_id),
+      });
       invalidatePendingAggregate();
     });
 
@@ -614,8 +691,12 @@ export function useRealtimeSync(
       // this branch only flipped pending — the comment "No new message"
       // was true then, but FailTask now persists a row.
       qc.setQueryData(chatKeys.pendingTask(payload.chat_session_id), {});
-      qc.invalidateQueries({ queryKey: chatKeys.messages(payload.chat_session_id) });
-      qc.invalidateQueries({ queryKey: chatKeys.pendingTask(payload.chat_session_id) });
+      qc.invalidateQueries({
+        queryKey: chatKeys.messages(payload.chat_session_id),
+      });
+      qc.invalidateQueries({
+        queryKey: chatKeys.pendingTask(payload.chat_session_id),
+      });
       invalidatePendingAggregate();
     });
 
@@ -642,6 +723,9 @@ export function useRealtimeSync(
       unsubIssueReactionRemoved();
       unsubSubscriberAdded();
       unsubSubscriberRemoved();
+      unsubTimeEntryCreated();
+      unsubTimeEntryDeleted();
+      unsubTimeEntryUpdated();
       unsubWsDeleted();
       unsubMemberRemoved();
       unsubMemberAdded();

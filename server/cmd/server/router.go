@@ -323,8 +323,21 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/labels", h.ListLabelsForIssue)
 					r.Post("/labels", h.AttachLabel)
 					r.Delete("/labels/{labelId}", h.DetachLabel)
+					// Integration links
+					r.Get("/integration-links", h.ListIssueIntegrationLinks)
+					r.Post("/integration-links", h.UpsertIssueIntegrationLink)
+					r.Delete("/integration-links/{provider}", h.DeleteIssueIntegrationLink)
+					// Time entries
+					r.Get("/time-entries", h.ListTimeEntries)
+					r.Post("/time-entries", h.CreateTimeEntry)
 				})
 			})
+
+			// Time entry standalone routes (don't need issueId in URL)
+			r.Delete("/api/time-entries/{id}", h.DeleteTimeEntry)
+			r.Put("/api/time-entries/{id}", h.UpdateTimeEntry)
+			r.Post("/api/time-entries/bulk-retry", h.BulkRetrySyncFailed)
+			r.Get("/api/time-tracking/dashboard", h.TimeTrackingDashboard)
 
 			// Task messages (user-facing, not daemon auth)
 			r.Get("/api/tasks/{taskId}/messages", h.ListTaskMessagesByUser)
@@ -349,6 +362,29 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/", h.GetProject)
 					r.Put("/", h.UpdateProject)
 					r.Delete("/", h.DeleteProject)
+					// Integration links
+					r.Get("/integration-links", h.ListProjectIntegrationLinks)
+					r.Post("/integration-links", h.UpsertProjectIntegrationLink)
+					r.Delete("/integration-links/{provider}", h.DeleteProjectIntegrationLink)
+				})
+			})
+
+			// Workspace integrations (Redmine, Jira, ...)
+			r.Route("/api/workspaces/integrations", func(r chi.Router) {
+				r.Get("/", h.ListWorkspaceIntegrations)
+				r.Post("/", h.UpsertWorkspaceIntegration)
+				r.Route("/{provider}", func(r chi.Router) {
+					r.Delete("/", h.DeleteWorkspaceIntegration)
+					r.Get("/credential", h.GetMyCredential)
+					r.Put("/credential", h.UpsertMyCredential)
+					r.Delete("/credential", h.DeleteMyCredential)
+				})
+				r.Route("/redmine/external", func(r chi.Router) {
+					r.Get("/projects", h.ListRedmineProjects)
+					r.Post("/projects", h.CreateRedmineProject)
+					r.Get("/projects/{projectId}/issues", h.ListRedmineIssues)
+					r.Post("/issues", h.CreateRedmineIssue)
+					r.Get("/activities", h.ListRedmineActivities)
 				})
 			})
 

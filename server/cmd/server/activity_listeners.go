@@ -211,6 +211,76 @@ func registerActivityListeners(bus *events.Bus, queries *db.Queries) {
 		}
 	})
 
+	// issue_integration_link:changed — record "redmine_linked" activity
+	bus.Subscribe(protocol.EventIssueIntegrationLinkChanged, func(e events.Event) {
+		payload, ok := e.Payload.(map[string]any)
+		if !ok {
+			return
+		}
+		issueID, _ := payload["issue_id"].(string)
+		if issueID == "" {
+			return
+		}
+		fromID, _ := payload["from"].(string)
+		toID, _ := payload["to"].(string)
+		var toTitle *string
+		if t, ok := payload["to_title"].(*string); ok {
+			toTitle = t
+		}
+		detailsMap := map[string]string{
+			"from": fromID,
+			"to":   toID,
+		}
+		if toTitle != nil {
+			detailsMap["to_title"] = *toTitle
+		}
+		details, _ := json.Marshal(detailsMap)
+		activity, err := queries.CreateActivity(ctx, db.CreateActivityParams{
+			WorkspaceID: parseUUID(e.WorkspaceID),
+			IssueID:     parseUUID(issueID),
+			ActorType:   util.StrToText(e.ActorType),
+			ActorID:     parseUUID(e.ActorID),
+			Action:      "redmine_linked",
+			Details:     details,
+		})
+		if err != nil {
+			slog.Error("activity: failed to record redmine link change",
+				"issue_id", issueID, "error", err)
+			return
+		}
+		publishActivityEvent(bus, e, activity)
+	})
+
+	// issue_integration_link:deleted — record "redmine_unlinked" activity
+	bus.Subscribe(protocol.EventIssueIntegrationLinkDeleted, func(e events.Event) {
+		payload, ok := e.Payload.(map[string]any)
+		if !ok {
+			return
+		}
+		issueID, _ := payload["issue_id"].(string)
+		if issueID == "" {
+			return
+		}
+		fromID, _ := payload["from"].(string)
+		details, _ := json.Marshal(map[string]string{
+			"from": fromID,
+		})
+		activity, err := queries.CreateActivity(ctx, db.CreateActivityParams{
+			WorkspaceID: parseUUID(e.WorkspaceID),
+			IssueID:     parseUUID(issueID),
+			ActorType:   util.StrToText(e.ActorType),
+			ActorID:     parseUUID(e.ActorID),
+			Action:      "redmine_unlinked",
+			Details:     details,
+		})
+		if err != nil {
+			slog.Error("activity: failed to record redmine link deletion",
+				"issue_id", issueID, "error", err)
+			return
+		}
+		publishActivityEvent(bus, e, activity)
+	})
+
 	// task:completed — record "task_completed" activity
 	bus.Subscribe(protocol.EventTaskCompleted, func(e events.Event) {
 		handleTaskActivity(ctx, bus, queries, e, "task_completed")
@@ -219,6 +289,72 @@ func registerActivityListeners(bus *events.Bus, queries *db.Queries) {
 	// task:failed — record "task_failed" activity
 	bus.Subscribe(protocol.EventTaskFailed, func(e events.Event) {
 		handleTaskActivity(ctx, bus, queries, e, "task_failed")
+	})
+
+	// time_entry:created — record "time_logged" activity
+	bus.Subscribe(protocol.EventTimeEntryCreated, func(e events.Event) {
+		payload, ok := e.Payload.(map[string]any)
+		if !ok {
+			return
+		}
+		issueID, _ := payload["issue_id"].(string)
+		if issueID == "" {
+			return
+		}
+		te, _ := payload["time_entry"].(handler.TimeEntryResponse)
+		detailsMap := map[string]any{
+			"duration_minutes": te.DurationMinutes,
+			"comment":          te.Comment,
+			"sync_status":      te.SyncStatus,
+		}
+		if te.ActivityName != nil {
+			detailsMap["activity_name"] = *te.ActivityName
+		}
+		details, _ := json.Marshal(detailsMap)
+		activity, err := queries.CreateActivity(ctx, db.CreateActivityParams{
+			WorkspaceID: parseUUID(e.WorkspaceID),
+			IssueID:     parseUUID(issueID),
+			ActorType:   util.StrToText(e.ActorType),
+			ActorID:     parseUUID(e.ActorID),
+			Action:      "time_logged",
+			Details:     details,
+		})
+		if err != nil {
+			slog.Error("activity: failed to record time_logged",
+				"issue_id", issueID, "error", err)
+			return
+		}
+		publishActivityEvent(bus, e, activity)
+	})
+
+	// time_entry:deleted — record "time_entry_deleted" activity
+	bus.Subscribe(protocol.EventTimeEntryDeleted, func(e events.Event) {
+		payload, ok := e.Payload.(map[string]any)
+		if !ok {
+			return
+		}
+		issueID, _ := payload["issue_id"].(string)
+		if issueID == "" {
+			return
+		}
+		timeEntryID, _ := payload["time_entry_id"].(string)
+		details, _ := json.Marshal(map[string]string{
+			"time_entry_id": timeEntryID,
+		})
+		activity, err := queries.CreateActivity(ctx, db.CreateActivityParams{
+			WorkspaceID: parseUUID(e.WorkspaceID),
+			IssueID:     parseUUID(issueID),
+			ActorType:   util.StrToText(e.ActorType),
+			ActorID:     parseUUID(e.ActorID),
+			Action:      "time_entry_deleted",
+			Details:     details,
+		})
+		if err != nil {
+			slog.Error("activity: failed to record time_entry_deleted",
+				"issue_id", issueID, "error", err)
+			return
+		}
+		publishActivityEvent(bus, e, activity)
 	})
 }
 

@@ -55,6 +55,10 @@ const (
 	EventSubscriberAdded   = "subscriber:added"
 	EventSubscriberRemoved = "subscriber:removed"
 
+	// Integration link events
+	EventIssueIntegrationLinkChanged = "issue_integration_link:changed"
+	EventIssueIntegrationLinkDeleted = "issue_integration_link:deleted"
+
 	// Activity events
 	EventActivityCreated = "activity:created"
 
@@ -102,4 +106,9 @@ const (
 	EventDaemonHeartbeatAck  = "daemon:heartbeat_ack"
 	EventDaemonRegister      = "daemon:register"
 	EventDaemonTaskAvailable = "daemon:task_available"
+
+	// Time entry events
+	EventTimeEntryCreated = "time_entry:created"
+	EventTimeEntryUpdated = "time_entry:updated"
+	EventTimeEntryDeleted = "time_entry:deleted"
 )

@@ -1,4 +1,10 @@
-export type { Issue, IssueStatus, IssuePriority, IssueAssigneeType, IssueReaction } from "./issue";
+export type {
+  Issue,
+  IssueStatus,
+  IssuePriority,
+  IssueAssigneeType,
+  IssueReaction,
+} from "./issue";
 export type {
   Agent,
   AgentStatus,
@@ -36,19 +42,57 @@ export type {
   RuntimeLocalSkillImportResult,
   IssueUsageSummary,
 } from "./agent";
-export type { Workspace, WorkspaceRepo, Member, MemberRole, User, MemberWithUser, Invitation } from "./workspace";
+export type {
+  Workspace,
+  WorkspaceRepo,
+  Member,
+  MemberRole,
+  User,
+  MemberWithUser,
+  Invitation,
+} from "./workspace";
 export type { InboxItem, InboxSeverity, InboxItemType } from "./inbox";
-export type { Comment, CommentType, CommentAuthorType, Reaction } from "./comment";
-export type { Label, CreateLabelRequest, UpdateLabelRequest, ListLabelsResponse, IssueLabelsResponse } from "./label";
+export type {
+  Comment,
+  CommentType,
+  CommentAuthorType,
+  Reaction,
+} from "./comment";
+export type {
+  Label,
+  CreateLabelRequest,
+  UpdateLabelRequest,
+  ListLabelsResponse,
+  IssueLabelsResponse,
+} from "./label";
 export type { TimelineEntry, AssigneeFrequencyEntry } from "./activity";
 export type { IssueSubscriber } from "./subscriber";
 export type * from "./events";
 export type * from "./api";
 export type { Attachment } from "./attachment";
-export type { ChatSession, ChatMessage, ChatPendingTask, PendingChatTaskItem, PendingChatTasksResponse, SendChatMessageResponse } from "./chat";
+export type {
+  ChatSession,
+  ChatMessage,
+  ChatPendingTask,
+  PendingChatTaskItem,
+  PendingChatTasksResponse,
+  SendChatMessageResponse,
+} from "./chat";
 export type { StorageAdapter } from "./storage";
-export type { Project, ProjectStatus, ProjectPriority, CreateProjectRequest, UpdateProjectRequest, ListProjectsResponse } from "./project";
-export type { PinnedItem, PinnedItemType, CreatePinRequest, ReorderPinsRequest } from "./pin";
+export type {
+  Project,
+  ProjectStatus,
+  ProjectPriority,
+  CreateProjectRequest,
+  UpdateProjectRequest,
+  ListProjectsResponse,
+} from "./project";
+export type {
+  PinnedItem,
+  PinnedItemType,
+  CreatePinRequest,
+  ReorderPinsRequest,
+} from "./pin";
 export type {
   Autopilot,
   AutopilotStatus,
@@ -66,3 +110,23 @@ export type {
   GetAutopilotResponse,
   ListAutopilotRunsResponse,
 } from "./autopilot";
+export type {
+  IntegrationProvider,
+  WorkspaceIntegration,
+  UserIntegrationCredential,
+  ProjectIntegrationLink,
+  IssueIntegrationLink,
+  RedmineProject,
+  RedmineIssue,
+} from "./integration";
+export type {
+  TimeEntry,
+  TimeEntrySyncStatus,
+  RedmineActivity,
+  CreateTimeEntryRequest,
+  UpdateTimeEntryRequest,
+  ListTimeEntriesResponse,
+  BulkRetryResponse,
+  DashboardEntry,
+  DashboardResponse,
+} from "./time-entry";

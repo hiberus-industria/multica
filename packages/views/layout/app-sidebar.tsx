@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@multica/ui/lib/utils";
 import { AppLink, useNavigation } from "../navigation";
 import { HelpLauncher } from "./help-launcher";
+import { SidebarTimerIndicator } from "../time-tracking/sidebar-timer-indicator";
 import {
   DndContext,
   PointerSensor,
@@ -12,13 +13,19 @@ import {
   closestCenter,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Inbox,
   ListTodo,
   Bot,
   Monitor,
+  Clock,
   ChevronDown,
   ChevronRight,
   Settings,
@@ -34,8 +41,16 @@ import {
 } from "lucide-react";
 import { WorkspaceAvatar } from "../workspace/workspace-avatar";
 import { ActorAvatar } from "@multica/ui/components/common/actor-avatar";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@multica/ui/components/ui/tooltip";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@multica/ui/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@multica/ui/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@multica/ui/components/ui/collapsible";
 import { StatusIcon } from "../issues/components/status-icon";
 import { useIssueDraftStore } from "@multica/core/issues/stores/draft-store";
 import { useCreateModeStore } from "@multica/core/issues/stores/create-mode-store";
@@ -62,8 +77,16 @@ import {
   DropdownMenuTrigger,
 } from "@multica/ui/components/ui/dropdown-menu";
 import { useAuthStore } from "@multica/core/auth";
-import { useCurrentWorkspace, useWorkspacePaths, paths } from "@multica/core/paths";
-import { workspaceListOptions, myInvitationListOptions, workspaceKeys } from "@multica/core/workspace/queries";
+import {
+  useCurrentWorkspace,
+  useWorkspacePaths,
+  paths,
+} from "@multica/core/paths";
+import {
+  workspaceListOptions,
+  myInvitationListOptions,
+  workspaceKeys,
+} from "@multica/core/workspace/queries";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { inboxKeys, deduplicateInboxItems } from "@multica/core/inbox/queries";
 import { api } from "@multica/core/api";
@@ -105,6 +128,7 @@ type NavKey =
   | "projects"
   | "autopilots"
   | "agents"
+  | "timeTracking"
   | "runtimes"
   | "skills"
   | "settings";
@@ -112,6 +136,7 @@ type NavKey =
 const personalNav: { key: NavKey; label: string; icon: typeof Inbox }[] = [
   { key: "inbox", label: "Inbox", icon: Inbox },
   { key: "myIssues", label: "My Issues", icon: CircleUser },
+  { key: "timeTracking", label: "Time Tracking", icon: Clock },
 ];
 
 const workspaceNav: { key: NavKey; label: string; icon: typeof Inbox }[] = [
@@ -128,9 +153,13 @@ const configureNav: { key: NavKey; label: string; icon: typeof Inbox }[] = [
 ];
 
 function DraftDot() {
-  const hasDraft = useIssueDraftStore((s) => !!(s.draft.title || s.draft.description));
+  const hasDraft = useIssueDraftStore(
+    (s) => !!(s.draft.title || s.draft.description),
+  );
   if (!hasDraft) return null;
-  return <span className="absolute top-0 right-0 size-1.5 rounded-full bg-brand" />;
+  return (
+    <span className="absolute top-0 right-0 size-1.5 rounded-full bg-brand" />
+  );
 }
 
 /**
@@ -154,7 +183,14 @@ function SortablePinItem({
   label: string;
   iconNode: React.ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: pin.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: pin.id });
   const wasDragged = useRef(false);
 
   useEffect(() => {
@@ -192,10 +228,14 @@ function SortablePinItem({
         <span
           className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"
           style={{
-            maskImage: "linear-gradient(to right, black calc(100% - 12px), transparent)",
-            WebkitMaskImage: "linear-gradient(to right, black calc(100% - 12px), transparent)",
+            maskImage:
+              "linear-gradient(to right, black calc(100% - 12px), transparent)",
+            WebkitMaskImage:
+              "linear-gradient(to right, black calc(100% - 12px), transparent)",
           }}
-        >{label}</span>
+        >
+          {label}
+        </span>
         <Tooltip>
           <TooltipTrigger
             render={<span role="button" />}
@@ -208,7 +248,9 @@ function SortablePinItem({
           >
             <X className="size-1" />
           </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={4}>Unpin</TooltipContent>
+          <TooltipContent side="top" sideOffset={4}>
+            Unpin
+          </TooltipContent>
         </Tooltip>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -252,7 +294,9 @@ function PinRow({
     if (issueQuery.isPending) return <PinSkeleton />;
     if (issueQuery.isError || !issueQuery.data) return null;
     const issue = issueQuery.data;
-    const label = issue.identifier ? `${issue.identifier} ${issue.title}` : issue.title;
+    const label = issue.identifier
+      ? `${issue.identifier} ${issue.title}`
+      : issue.title;
     const iconNode = (
       /* Override parent [&_svg]:size-4 — pinned items need smaller icons to match sm size */
       <StatusIcon status={issue.status} className="!size-3.5 shrink-0" />
@@ -307,15 +351,24 @@ interface AppSidebarProps {
   headerStyle?: React.CSSProperties;
 }
 
-export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }: AppSidebarProps = {}) {
+export function AppSidebar({
+  topSlot,
+  searchSlot,
+  headerClassName,
+  headerStyle,
+}: AppSidebarProps = {}) {
   const { pathname, push } = useNavigation();
   const user = useAuthStore((s) => s.user);
   const userId = useAuthStore((s) => s.user?.id);
   const logout = useLogout();
   const workspace = useCurrentWorkspace();
   const p = useWorkspacePaths();
-  const { data: workspaces = EMPTY_WORKSPACES } = useQuery(workspaceListOptions());
-  const { data: myInvitations = EMPTY_INVITATIONS } = useQuery(myInvitationListOptions());
+  const { data: workspaces = EMPTY_WORKSPACES } = useQuery(
+    workspaceListOptions(),
+  );
+  const { data: myInvitations = EMPTY_INVITATIONS } = useQuery(
+    myInvitationListOptions(),
+  );
 
   const wsId = workspace?.id;
   const { data: inboxItems = EMPTY_INBOX } = useQuery({
@@ -334,7 +387,9 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
   });
   const deletePin = useDeletePin();
   const reorderPins = useReorderPins();
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
 
   // Local presentational copy of pinnedItems for drop-animation stability.
   // Follows TQ at rest; frozen during a drag gesture so a mid-drag cache
@@ -374,7 +429,9 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
     // new one appear in the dropdown — silent and confusing (this is MUL-820).
     onSuccess: async (_, invitationId) => {
       const invitation = myInvitations.find((i) => i.id === invitationId);
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.myInvitations() });
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.myInvitations(),
+      });
       // staleTime: 0 forces a real network fetch — we need the joined workspace
       // in the list before we can resolve its slug for navigation.
       const list = await queryClient.fetchQuery({
@@ -392,7 +449,9 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
   const declineInvitationMut = useMutation({
     mutationFn: (id: string) => api.declineInvitation(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.myInvitations() });
+      queryClient.invalidateQueries({
+        queryKey: workspaceKeys.myInvitations(),
+      });
     },
   });
 
@@ -429,273 +488,305 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
   }, [pathname]);
 
   return (
-      <Sidebar variant="inset">
-        {topSlot}
-        {/* Workspace Switcher */}
-        <SidebarHeader className={cn("py-3", headerClassName)} style={headerStyle}>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <SidebarMenuButton>
-                      <span className="relative">
-                        <WorkspaceAvatar name={workspace?.name ?? "M"} size="sm" />
-                        {myInvitations.length > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-brand ring-1 ring-sidebar" />
-                        )}
-                      </span>
-                      <span className="flex-1 truncate font-medium">
-                        {workspace?.name ?? "Multica"}
-                      </span>
-                      <ChevronDown className="size-3 text-muted-foreground" />
-                    </SidebarMenuButton>
-                  }
-                />
-                <DropdownMenuContent
-                  className="w-auto min-w-56"
-                  align="start"
-                  side="bottom"
-                  sideOffset={4}
-                >
-                  <div className="flex items-center gap-2.5 px-2 py-1.5">
-                    <ActorAvatar
-                      name={user?.name ?? ""}
-                      initials={(user?.name ?? "U").charAt(0).toUpperCase()}
-                      avatarUrl={user?.avatar_url}
-                      size={32}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium leading-tight">
-                        {user?.name}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground leading-tight">
-                        {user?.email}
-                      </p>
-                    </div>
+    <Sidebar variant="inset">
+      {topSlot}
+      {/* Workspace Switcher */}
+      <SidebarHeader
+        className={cn("py-3", headerClassName)}
+        style={headerStyle}
+      >
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <SidebarMenuButton>
+                    <span className="relative">
+                      <WorkspaceAvatar
+                        name={workspace?.name ?? "M"}
+                        size="sm"
+                      />
+                      {myInvitations.length > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-brand ring-1 ring-sidebar" />
+                      )}
+                    </span>
+                    <span className="flex-1 truncate font-medium">
+                      {workspace?.name ?? "Multica"}
+                    </span>
+                    <ChevronDown className="size-3 text-muted-foreground" />
+                  </SidebarMenuButton>
+                }
+              />
+              <DropdownMenuContent
+                className="w-auto min-w-56"
+                align="start"
+                side="bottom"
+                sideOffset={4}
+              >
+                <div className="flex items-center gap-2.5 px-2 py-1.5">
+                  <ActorAvatar
+                    name={user?.name ?? ""}
+                    initials={(user?.name ?? "U").charAt(0).toUpperCase()}
+                    avatarUrl={user?.avatar_url}
+                    size={32}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium leading-tight">
+                      {user?.name}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground leading-tight">
+                      {user?.email}
+                    </p>
                   </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">
-                      Workspaces
-                    </DropdownMenuLabel>
-                    {workspaces.map((ws) => (
-                      <DropdownMenuItem
-                        key={ws.id}
-                        render={
-                          <AppLink href={paths.workspace(ws.slug).issues()} />
-                        }
-                      >
-                        <WorkspaceAvatar name={ws.name} size="sm" />
-                        <span className="flex-1 truncate">{ws.name}</span>
-                        {ws.id === workspace?.id && (
-                          <Check className="h-3.5 w-3.5 text-primary" />
-                        )}
-                      </DropdownMenuItem>
-                    ))}
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Workspaces
+                  </DropdownMenuLabel>
+                  {workspaces.map((ws) => (
                     <DropdownMenuItem
-                      onClick={() =>
-                        useModalStore.getState().open("create-workspace")
+                      key={ws.id}
+                      render={
+                        <AppLink href={paths.workspace(ws.slug).issues()} />
                       }
                     >
-                      <Plus className="h-3.5 w-3.5" />
-                      Create workspace
+                      <WorkspaceAvatar name={ws.name} size="sm" />
+                      <span className="flex-1 truncate">{ws.name}</span>
+                      {ws.id === workspace?.id && (
+                        <Check className="h-3.5 w-3.5 text-primary" />
+                      )}
                     </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                  {myInvitations.length > 0 && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuGroup>
-                        <DropdownMenuLabel className="text-xs text-muted-foreground">
-                          Pending invitations
-                        </DropdownMenuLabel>
-                        {myInvitations.map((inv) => (
-                          <div key={inv.id} className="flex items-center gap-2 px-2 py-1.5">
-                            <WorkspaceAvatar name={inv.workspace_name ?? "W"} size="sm" />
-                            <span className="flex-1 truncate text-sm">{inv.workspace_name ?? "Workspace"}</span>
-                            <button
-                              type="button"
-                              className="text-xs px-2 py-0.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                              disabled={acceptInvitationMut.isPending}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                acceptInvitationMut.mutate(inv.id);
-                              }}
-                            >
-                              Join
-                            </button>
-                            <button
-                              type="button"
-                              className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50"
-                              disabled={declineInvitationMut.isPending}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                declineInvitationMut.mutate(inv.id);
-                              }}
-                            >
-                              Decline
-                            </button>
-                          </div>
-                        ))}
-                      </DropdownMenuGroup>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem variant="destructive" onClick={logout}>
-                      <LogOut className="h-3.5 w-3.5" />
-                      Log out
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <SidebarMenu>
-            {searchSlot && (
-              <SidebarMenuItem>
-                {searchSlot}
-              </SidebarMenuItem>
-            )}
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                className="text-muted-foreground"
-                onClick={() => useModalStore.getState().open("create-issue")}
-              >
-                <span className="relative">
-                  <SquarePen />
-                  <DraftDot />
-                </span>
-                <span>New Issue</span>
-                <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">C</kbd>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-
-        {/* Navigation */}
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
-                {personalNav.map((item) => {
-                  const href = p[item.key]();
-                  const isActive = isNavActive(pathname, href);
-                  return (
-                    <SidebarMenuItem key={item.key}>
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        render={<AppLink href={href} />}
-                        className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
-                      >
-                        <item.icon />
-                        <span>{item.label}</span>
-                        {item.label === "Inbox" && unreadCount > 0 && (
-                          <span className="ml-auto text-xs">
-                            {unreadCount > 99 ? "99+" : unreadCount}
+                  ))}
+                  <DropdownMenuItem
+                    onClick={() =>
+                      useModalStore.getState().open("create-workspace")
+                    }
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Create workspace
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                {myInvitations.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">
+                        Pending invitations
+                      </DropdownMenuLabel>
+                      {myInvitations.map((inv) => (
+                        <div
+                          key={inv.id}
+                          className="flex items-center gap-2 px-2 py-1.5"
+                        >
+                          <WorkspaceAvatar
+                            name={inv.workspace_name ?? "W"}
+                            size="sm"
+                          />
+                          <span className="flex-1 truncate text-sm">
+                            {inv.workspace_name ?? "Workspace"}
                           </span>
-                        )}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-0.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                            disabled={acceptInvitationMut.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              acceptInvitationMut.mutate(inv.id);
+                            }}
+                          >
+                            Join
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50"
+                            disabled={declineInvitationMut.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              declineInvitationMut.mutate(inv.id);
+                            }}
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      ))}
+                    </DropdownMenuGroup>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem variant="destructive" onClick={logout}>
+                    <LogOut className="h-3.5 w-3.5" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarMenu>
+          {searchSlot && <SidebarMenuItem>{searchSlot}</SidebarMenuItem>}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              className="text-muted-foreground"
+              onClick={() => useModalStore.getState().open("create-issue")}
+            >
+              <span className="relative">
+                <SquarePen />
+                <DraftDot />
+              </span>
+              <span>New Issue</span>
+              <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                C
+              </kbd>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
 
-          {localPinned.length > 0 && (
-            <Collapsible defaultOpen>
-              <SidebarGroup className="group/pinned">
-                <SidebarGroupLabel
-                  render={<CollapsibleTrigger />}
-                  className="group/trigger cursor-pointer hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
-                >
-                  <span>Pinned</span>
-                  <ChevronRight className="!size-3 ml-1 stroke-[2.5] transition-transform duration-200 group-data-[panel-open]/trigger:rotate-90" />
-                  <span className="ml-auto text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover/pinned:opacity-100">{localPinned.length}</span>
-                </SidebarGroupLabel>
-                <CollapsibleContent>
-                  <SidebarGroupContent>
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                      <SortableContext items={localPinned.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                        <SidebarMenu className="gap-0.5">
-                          {localPinned.map((pin: PinnedItem) => (
-                            <PinRow
-                              key={pin.id}
-                              pin={pin}
-                              href={pin.item_type === "issue" ? p.issueDetail(pin.item_id) : p.projectDetail(pin.item_id)}
-                              pathname={pathname}
-                              onUnpin={() => deletePin.mutate({ itemType: pin.item_type, itemId: pin.item_id })}
-                              wsId={wsId ?? ""}
-                            />
-                          ))}
-                        </SidebarMenu>
-                      </SortableContext>
-                    </DndContext>
-                  </SidebarGroupContent>
-                </CollapsibleContent>
-              </SidebarGroup>
-            </Collapsible>
-          )}
+      {/* Navigation */}
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              {personalNav.map((item) => {
+                const href = p[item.key]();
+                const isActive = isNavActive(pathname, href);
+                return (
+                  <SidebarMenuItem key={item.key}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      render={<AppLink href={href} />}
+                      className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                      {item.label === "Inbox" && unreadCount > 0 && (
+                        <span className="ml-auto text-xs">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-          <SidebarGroup>
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
-                {workspaceNav.map((item) => {
-                  const href = p[item.key]();
-                  const isActive = isNavActive(pathname, href);
-                  return (
-                    <SidebarMenuItem key={item.key}>
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        render={<AppLink href={href} />}
-                        className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
-                      >
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+        {localPinned.length > 0 && (
+          <Collapsible defaultOpen>
+            <SidebarGroup className="group/pinned">
+              <SidebarGroupLabel
+                render={<CollapsibleTrigger />}
+                className="group/trigger cursor-pointer hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+              >
+                <span>Pinned</span>
+                <ChevronRight className="!size-3 ml-1 stroke-[2.5] transition-transform duration-200 group-data-[panel-open]/trigger:rotate-90" />
+                <span className="ml-auto text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover/pinned:opacity-100">
+                  {localPinned.length}
+                </span>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={localPinned.map((p) => p.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <SidebarMenu className="gap-0.5">
+                        {localPinned.map((pin: PinnedItem) => (
+                          <PinRow
+                            key={pin.id}
+                            pin={pin}
+                            href={
+                              pin.item_type === "issue"
+                                ? p.issueDetail(pin.item_id)
+                                : p.projectDetail(pin.item_id)
+                            }
+                            pathname={pathname}
+                            onUnpin={() =>
+                              deletePin.mutate({
+                                itemType: pin.item_type,
+                                itemId: pin.item_id,
+                              })
+                            }
+                            wsId={wsId ?? ""}
+                          />
+                        ))}
+                      </SidebarMenu>
+                    </SortableContext>
+                  </DndContext>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
 
-          <SidebarGroup>
-            <SidebarGroupLabel>Configure</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
-                {configureNav.map((item) => {
-                  const href = p[item.key]();
-                  const isActive = isNavActive(pathname, href);
-                  return (
-                    <SidebarMenuItem key={item.key}>
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        render={<AppLink href={href} />}
-                        className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
-                      >
-                        <item.icon />
-                        <span>{item.label}</span>
-                        {item.label === "Runtimes" && hasRuntimeUpdates && (
-                          <span className="ml-auto size-1.5 rounded-full bg-destructive" />
-                        )}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              {workspaceNav.map((item) => {
+                const href = p[item.key]();
+                const isActive = isNavActive(pathname, href);
+                return (
+                  <SidebarMenuItem key={item.key}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      render={<AppLink href={href} />}
+                      className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-        <SidebarFooter className="p-2">
-          <div className="flex justify-end">
-            <HelpLauncher />
-          </div>
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
+        <SidebarGroup>
+          <SidebarGroupLabel>Configure</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              {configureNav.map((item) => {
+                const href = p[item.key]();
+                const isActive = isNavActive(pathname, href);
+                return (
+                  <SidebarMenuItem key={item.key}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      render={<AppLink href={href} />}
+                      className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                      {item.label === "Runtimes" && hasRuntimeUpdates && (
+                        <span className="ml-auto size-1.5 rounded-full bg-destructive" />
+                      )}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="p-2">
+        <SidebarTimerIndicator />
+        <div className="flex justify-end">
+          <HelpLauncher />
+        </div>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   );
 }

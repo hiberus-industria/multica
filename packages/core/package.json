@@ -61,6 +61,9 @@
     "./pins/mutations": "./pins/mutations.ts",
     "./feedback": "./feedback/index.ts",
     "./feedback/mutations": "./feedback/mutations.ts",
+    "./integrations": "./integrations/index.ts",
+    "./integrations/queries": "./integrations/queries.ts",
+    "./integrations/mutations": "./integrations/mutations.ts",
     "./realtime": "./realtime/index.ts",
     "./navigation": "./navigation/index.ts",
     "./modals": "./modals/index.ts",
@@ -74,7 +77,12 @@
     "./utils": "./utils.ts",
     "./constants/*": "./constants/*.ts",
     "./platform": "./platform/index.ts",
-    "./analytics": "./analytics/index.ts"
+    "./analytics": "./analytics/index.ts",
+    "./time-entries": "./time-entries/index.ts",
+    "./time-entries/queries": "./time-entries/queries.ts",
+    "./time-entries/mutations": "./time-entries/mutations.ts",
+    "./time-entries/timer-store": "./time-entries/timer-store.ts",
+    "./time-entries/idle-store": "./time-entries/idle-store.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "catalog:",
