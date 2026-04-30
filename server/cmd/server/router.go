@@ -362,6 +362,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/", h.GetProject)
 					r.Put("/", h.UpdateProject)
 					r.Delete("/", h.DeleteProject)
+					r.Get("/resources", h.ListProjectResources)
+					r.Post("/resources", h.CreateProjectResource)
+					r.Delete("/resources/{resourceId}", h.DeleteProjectResource)
 					// Integration links
 					r.Get("/integration-links", h.ListProjectIntegrationLinks)
 					r.Post("/integration-links", h.UpsertProjectIntegrationLink)
@@ -522,6 +525,12 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.Post("/archive-completed", h.ArchiveCompletedInbox)
 				r.Post("/{id}/read", h.MarkInboxRead)
 				r.Post("/{id}/archive", h.ArchiveInboxItem)
+			})
+
+			// Notification preferences
+			r.Route("/api/notification-preferences", func(r chi.Router) {
+				r.Get("/", h.GetNotificationPreferences)
+				r.Put("/", h.UpdateNotificationPreferences)
 			})
 		})
 	})

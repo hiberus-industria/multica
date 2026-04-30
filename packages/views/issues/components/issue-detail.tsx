@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
   MoreHorizontal,
   PanelRight,
   Pin,
@@ -215,6 +216,8 @@ function formatTokenCount(n: number): string {
 interface IssueDetailProps {
   issueId: string;
   onDelete?: () => void;
+  /** Called after the issue is marked as done via the toolbar button. */
+  onDone?: () => void;
   defaultSidebarOpen?: boolean;
   layoutId?: string;
   /** When set, the issue detail will auto-scroll to this comment and briefly highlight it. */
@@ -225,13 +228,7 @@ interface IssueDetailProps {
 // IssueDetail
 // ---------------------------------------------------------------------------
 
-export function IssueDetail({
-  issueId,
-  onDelete,
-  defaultSidebarOpen = true,
-  layoutId = "multica_issue_detail_layout",
-  highlightCommentId,
-}: IssueDetailProps) {
+export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = true, layoutId = "multica_issue_detail_layout", highlightCommentId }: IssueDetailProps) {
   const id = issueId;
   const router = useNavigation();
   const user = useAuthStore((s) => s.user);
@@ -242,6 +239,13 @@ export function IssueDetail({
   const wsId = useWorkspaceId();
   const { data: members = [] } = useQuery(memberListOptions(wsId));
   const { data: agents = [] } = useQuery(agentListOptions(wsId));
+  // Workspace owners and admins moderate any comment authored by anyone
+  // (mirrors backend `comment.go:507-512`). Computed here so per-comment
+  // rendering doesn't have to re-derive it for every row.
+  const currentUserRole =
+    members.find((m) => m.user_id === user?.id)?.role ?? null;
+  const canModerateComments =
+    currentUserRole === "owner" || currentUserRole === "admin";
   const { data: allIssues = [] } = useQuery(issueListOptions(wsId));
   const { getActorName } = useActorName();
   const { uploadWithToast } = useFileUpload(api);
@@ -250,14 +254,15 @@ export function IssueDetail({
   });
   const sidebarRef = usePanelRef();
   const isMobile = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(defaultSidebarOpen);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (isMobile) {
-      setSidebarOpen(false);
-      sidebarRef.current?.collapse();
+      setMobileSidebarOpen(false);
     }
   }, [isMobile]);
+  const sidebarOpen = isMobile ? mobileSidebarOpen : desktopSidebarOpen;
   const [propertiesOpen, setPropertiesOpen] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [parentIssueOpen, setParentIssueOpen] = useState(true);
@@ -366,7 +371,7 @@ export function IssueDetail({
     if (el) {
       didHighlightRef.current = highlightCommentId;
       requestAnimationFrame(() => {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.scrollIntoView({ behavior: "instant", block: "center" });
         setHighlightedId(highlightCommentId);
         const timer = setTimeout(() => setHighlightedId(null), 2000);
         return () => clearTimeout(timer);
@@ -391,6 +396,18 @@ export function IssueDetail({
   // Called before the `if (!issue)` early return so hook order stays stable.
   const actions = useIssueActions(issue);
   const handleUpdateField = actions.updateField;
+
+  const handleToggleSidebar = useCallback(() => {
+    if (isMobile) {
+      setMobileSidebarOpen((open) => !open);
+      return;
+    }
+
+    const panel = sidebarRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) panel.expand();
+    else panel.collapse();
+  }, [isMobile, sidebarRef]);
 
   if (loading) {
     return (
@@ -473,47 +490,26 @@ export function IssueDetail({
             className={`!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform ${propertiesOpen ? "rotate-90" : ""}`}
           />
         </button>
-        {propertiesOpen && (
-          <div className="space-y-0.5 pl-2">
-            <PropRow label="Status">
-              <StatusPicker
-                status={issue.status}
-                onUpdate={handleUpdateField}
-                align="start"
-              />
-            </PropRow>
-            <PropRow label="Priority">
-              <PriorityPicker
-                priority={issue.priority}
-                onUpdate={handleUpdateField}
-                align="start"
-              />
-            </PropRow>
-            <PropRow label="Assignee">
-              <AssigneePicker
-                assigneeType={issue.assignee_type}
-                assigneeId={issue.assignee_id}
-                onUpdate={handleUpdateField}
-                align="start"
-              />
-            </PropRow>
-            <PropRow label="Due date">
-              <DueDatePicker
-                dueDate={issue.due_date}
-                onUpdate={handleUpdateField}
-              />
-            </PropRow>
-            <PropRow label="Project">
-              <ProjectPicker
-                projectId={issue.project_id}
-                onUpdate={handleUpdateField}
-              />
-            </PropRow>
-            <PropRow label="Labels">
-              <LabelPicker issueId={issue.id} align="start" />
-            </PropRow>
-          </div>
-        )}
+        {propertiesOpen && <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 pl-2">
+          <PropRow label="Status">
+            <StatusPicker status={issue.status} onUpdate={handleUpdateField} align="start" />
+          </PropRow>
+          <PropRow label="Priority">
+            <PriorityPicker priority={issue.priority} onUpdate={handleUpdateField} align="start" />
+          </PropRow>
+          <PropRow label="Assignee">
+            <AssigneePicker assigneeType={issue.assignee_type} assigneeId={issue.assignee_id} onUpdate={handleUpdateField} align="start" />
+          </PropRow>
+          <PropRow label="Due date">
+            <DueDatePicker dueDate={issue.due_date} onUpdate={handleUpdateField} />
+          </PropRow>
+          <PropRow label="Project">
+            <ProjectPicker projectId={issue.project_id} onUpdate={handleUpdateField} />
+          </PropRow>
+          <PropRow label="Labels">
+            <LabelPicker issueId={issue.id} align="start" />
+          </PropRow>
+        </div>}
       </div>
 
       {/* Parent issue */}
@@ -561,30 +557,18 @@ export function IssueDetail({
             className={`!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform ${detailsOpen ? "rotate-90" : ""}`}
           />
         </button>
-        {detailsOpen && (
-          <div className="space-y-0.5 pl-2">
-            <PropRow label="Created by">
-              <ActorAvatar
-                actorType={issue.creator_type}
-                actorId={issue.creator_id}
-                size={18}
-              />
-              <span className="truncate">
-                {getActorName(issue.creator_type, issue.creator_id)}
-              </span>
-            </PropRow>
-            <PropRow label="Created">
-              <span className="text-muted-foreground">
-                {shortDate(issue.created_at)}
-              </span>
-            </PropRow>
-            <PropRow label="Updated">
-              <span className="text-muted-foreground">
-                {shortDate(issue.updated_at)}
-              </span>
-            </PropRow>
-          </div>
-        )}
+        {detailsOpen && <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 pl-2">
+          <PropRow label="Created by">
+            <ActorAvatar actorType={issue.creator_type} actorId={issue.creator_id} size={18} enableHoverCard />
+            <span className="cursor-pointer truncate">{getActorName(issue.creator_type, issue.creator_id)}</span>
+          </PropRow>
+          <PropRow label="Created">
+            <span className="text-muted-foreground">{shortDate(issue.created_at)}</span>
+          </PropRow>
+          <PropRow label="Updated">
+            <span className="text-muted-foreground">{shortDate(issue.updated_at)}</span>
+          </PropRow>
+        </div>}
       </div>
 
       {/* Execution log — active runs + collapsed past runs. Self-contained;
@@ -604,34 +588,24 @@ export function IssueDetail({
               className={`!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform ${tokenUsageOpen ? "rotate-90" : ""}`}
             />
           </button>
-          {tokenUsageOpen && (
-            <div className="space-y-0.5 pl-2">
-              <PropRow label="Input">
+          {tokenUsageOpen && <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 pl-2">
+            <PropRow label="Input">
+              <span className="text-muted-foreground">{formatTokenCount(usage.total_input_tokens)}</span>
+            </PropRow>
+            <PropRow label="Output">
+              <span className="text-muted-foreground">{formatTokenCount(usage.total_output_tokens)}</span>
+            </PropRow>
+            {(usage.total_cache_read_tokens > 0 || usage.total_cache_write_tokens > 0) && (
+              <PropRow label="Cache">
                 <span className="text-muted-foreground">
-                  {formatTokenCount(usage.total_input_tokens)}
+                  {formatTokenCount(usage.total_cache_read_tokens)} read / {formatTokenCount(usage.total_cache_write_tokens)} write
                 </span>
               </PropRow>
-              <PropRow label="Output">
-                <span className="text-muted-foreground">
-                  {formatTokenCount(usage.total_output_tokens)}
-                </span>
-              </PropRow>
-              {(usage.total_cache_read_tokens > 0 ||
-                usage.total_cache_write_tokens > 0) && (
-                  <PropRow label="Cache">
-                    <span className="text-muted-foreground">
-                      {formatTokenCount(usage.total_cache_read_tokens)} read /{" "}
-                      {formatTokenCount(usage.total_cache_write_tokens)} write
-                    </span>
-                  </PropRow>
-                )}
-              <PropRow label="Runs">
-                <span className="text-muted-foreground">
-                  {usage.task_count}
-                </span>
-              </PropRow>
-            </div>
-          )}
+            )}
+            <PropRow label="Runs">
+              <span className="text-muted-foreground">{usage.task_count}</span>
+            </PropRow>
+          </div>}
         </div>
       )}
 
@@ -654,653 +628,663 @@ export function IssueDetail({
     </div>
   );
 
-  return (
-    <ResizablePanelGroup
-      orientation="horizontal"
-      className="flex-1 min-h-0"
-      defaultLayout={defaultLayout}
-      onLayoutChanged={onLayoutChanged}
-    >
-      <ResizablePanel id="content" minSize="50%">
-        <div className="flex h-full flex-col">
-          <PageHeader className="gap-2 bg-background text-sm">
-            <div className="flex flex-1 items-center gap-1.5 min-w-0">
-              {workspace && (
-                <>
-                  <AppLink
-                    href={paths.issues()}
-                    className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+  const detailContent = (
+    <div className="flex h-full min-w-0 flex-1 flex-col">
+      <PageHeader className="gap-2 bg-background text-sm">
+        <div className="flex flex-1 items-center gap-1.5 min-w-0">
+          {workspace && (
+            <>
+              <AppLink
+                href={paths.issues()}
+                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              >
+                {workspace.name}
+              </AppLink>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+            </>
+          )}
+          {parentIssue && (
+            <>
+              <AppLink
+                href={paths.issueDetail(parentIssue.id)}
+                className="text-muted-foreground hover:text-foreground transition-colors truncate shrink-0"
+              >
+                {parentIssue.identifier}
+              </AppLink>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+            </>
+          )}
+          <span className="truncate font-medium text-foreground">
+            {issue.title}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {issue.status !== "done" && issue.status !== "cancelled" && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground"
+                    onClick={() => { handleUpdateField({ status: "done" }); onDone?.(); }}
                   >
-                    {workspace.name}
-                  </AppLink>
-                  <ChevronRight className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-                </>
-              )}
-              {parentIssue && (
-                <>
-                  <AppLink
-                    href={paths.issueDetail(parentIssue.id)}
-                    className="text-muted-foreground hover:text-foreground transition-colors truncate shrink-0"
-                  >
-                    {parentIssue.identifier}
-                  </AppLink>
-                  <ChevronRight className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-                </>
-              )}
-              <span className="truncate font-medium text-foreground">
-                {issue.title}
-              </span>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className={cn("text-muted-foreground", actions.isPinned && "text-foreground")}
-                      onClick={actions.togglePin}
-                    >
-                      {actions.isPinned ? <PinOff /> : <Pin />}
-                    </Button>
-                  }
-                />
-                <TooltipContent side="bottom">{actions.isPinned ? "Unpin from sidebar" : "Pin to sidebar"}</TooltipContent>
-              </Tooltip>
-              <IssueActionsDropdown
-                issue={issue}
-                align="end"
-                // When a parent passes `onDelete`, we detect deletion via effect
-                // above and skip navigation. Otherwise the modal navigates for us.
-                onDeletedNavigateTo={onDelete ? undefined : paths.issues()}
-                trigger={
-                  <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
-                    <MoreHorizontal />
+                    <CircleCheck />
                   </Button>
                 }
               />
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant={sidebarOpen ? "secondary" : "ghost"}
-                      size="icon-sm"
-                      className={sidebarOpen ? "" : "text-muted-foreground"}
-                      onClick={() => {
-                        if (isMobile) {
-                          setSidebarOpen(!sidebarOpen);
-                        } else {
-                          const panel = sidebarRef.current;
-                          if (!panel) return;
-                          if (panel.isCollapsed()) panel.expand();
-                          else panel.collapse();
-                        }
-                      }}
-                    >
-                      <PanelRight />
-                    </Button>
-                  }
-                />
-                <TooltipContent side="bottom">Toggle sidebar</TooltipContent>
-              </Tooltip>
-            </div>
-          </PageHeader>
-
-          {/* Content — scrollable */}
-          <div
-            ref={scrollContainerRef}
-            className="relative flex-1 overflow-y-auto"
-          >
-            <div className="mx-auto w-full max-w-4xl px-8 py-8">
-              <TitleEditor
-                key={`title-${id}`}
-                defaultValue={issue.title}
-                placeholder="Issue title"
-                className="w-full text-2xl font-bold leading-snug tracking-tight"
-                onBlur={(value) => {
-                  const trimmed = value.trim();
-                  if (trimmed && trimmed !== issue.title)
-                    handleUpdateField({ title: trimmed });
-                }}
-              />
-
-              {parentIssue && (
-                <AppLink
-                  href={paths.issueDetail(parentIssue.id)}
-                  className="mt-2 inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group/parent"
+              <TooltipContent side="bottom">Mark as done</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn("text-muted-foreground", actions.isPinned && "text-foreground")}
+                  onClick={actions.togglePin}
                 >
-                  <span className="font-medium shrink-0">Sub-issue of</span>
-                  <StatusIcon
-                    status={parentIssue.status}
-                    className="h-3.5 w-3.5 shrink-0"
-                  />
-                  <span className="tabular-nums shrink-0">
-                    {parentIssue.identifier}
-                  </span>
-                  <span className="truncate group-hover/parent:text-foreground">
-                    {parentIssue.title}
-                  </span>
-                  {parentChildIssues.length > 0 &&
-                    (() => {
-                      const done = parentChildIssues.filter(
-                        (c) => c.status === "done",
-                      ).length;
-                      return (
-                        <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 shrink-0">
-                          <ProgressRing
-                            done={done}
-                            total={parentChildIssues.length}
-                            size={11}
-                          />
-                          <span className="tabular-nums text-[10.5px] font-medium">
-                            {done}/{parentChildIssues.length}
-                          </span>
-                        </span>
-                      );
-                    })()}
-                </AppLink>
-              )}
+                  {actions.isPinned ? <PinOff /> : <Pin />}
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">{actions.isPinned ? "Unpin from sidebar" : "Pin to sidebar"}</TooltipContent>
+          </Tooltip>
+          <IssueActionsDropdown
+            issue={issue}
+            align="end"
+            // When a parent passes `onDelete`, we detect deletion via effect
+            // above and skip navigation. Otherwise the modal navigates for us.
+            onDeletedNavigateTo={onDelete ? undefined : paths.issues()}
+            trigger={
+              <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
+                <MoreHorizontal />
+              </Button>
+            }
+          />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant={sidebarOpen ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  className={sidebarOpen ? "" : "text-muted-foreground"}
+                  onClick={handleToggleSidebar}
+                >
+                  <PanelRight />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">Toggle sidebar</TooltipContent>
+          </Tooltip>
+        </div>
+      </PageHeader>
 
-              <div {...descDropZoneProps} className="relative mt-5 rounded-lg">
-                <ContentEditor
-                  ref={descEditorRef}
-                  key={id}
-                  defaultValue={issue.description || ""}
-                  placeholder="Add description..."
-                  onUpdate={(md) => handleUpdateField({ description: md })}
-                  onUploadFile={handleDescriptionUpload}
-                  debounceMs={1500}
-                  currentIssueId={id}
-                />
+      {/* Content — scrollable */}
+      <div
+        ref={scrollContainerRef}
+        className="relative flex-1 overflow-y-auto"
+      >
+        <div className="mx-auto w-full max-w-4xl px-8 py-8">
+          <TitleEditor
+            key={`title-${id}`}
+            defaultValue={issue.title}
+            placeholder="Issue title"
+            className="w-full text-2xl font-bold leading-snug tracking-tight"
+            onBlur={(value) => {
+              const trimmed = value.trim();
+              if (trimmed && trimmed !== issue.title)
+                handleUpdateField({ title: trimmed });
+            }}
+          />
 
-                <div className="flex items-center gap-1 mt-3">
-                  <ReactionBar
-                    reactions={issueReactions}
-                    currentUserId={user?.id}
-                    onToggle={handleToggleIssueReaction}
-                    getActorName={getActorName}
-                  />
-                  <FileUploadButton
-                    size="sm"
-                    onSelect={(file) => descEditorRef.current?.uploadFile(file)}
-                  />
-                </div>
-                {descDragOver && <FileDropOverlay />}
-              </div>
-
-              {/* Sub-issues — Linear-style */}
-              {childIssues.length === 0 && (
-                <div className="mt-6">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() =>
-                      useModalStore.getState().open("create-issue", {
-                        parent_issue_id: issue.id,
-                        parent_issue_identifier: issue.identifier,
-                      })
-                    }
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add sub-issues</span>
-                  </button>
-                </div>
-              )}
-              {childIssues.length > 0 &&
+          {parentIssue && (
+            <AppLink
+              href={paths.issueDetail(parentIssue.id)}
+              className="mt-2 inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group/parent"
+            >
+              <span className="font-medium shrink-0">Sub-issue of</span>
+              <StatusIcon
+                status={parentIssue.status}
+                className="h-3.5 w-3.5 shrink-0"
+              />
+              <span className="tabular-nums shrink-0">
+                {parentIssue.identifier}
+              </span>
+              <span className="truncate group-hover/parent:text-foreground">
+                {parentIssue.title}
+              </span>
+              {parentChildIssues.length > 0 &&
                 (() => {
-                  const doneCount = childIssues.filter(
+                  const done = parentChildIssues.filter(
                     (c) => c.status === "done",
                   ).length;
                   return (
-                    <div className="mt-10">
-                      {/* Header */}
-                      <div className="flex items-center gap-2 mb-2">
-                        <button
-                          type="button"
-                          onClick={() => setSubIssuesCollapsed((v) => !v)}
-                          className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-foreground/80 transition-colors"
-                        >
-                          <ChevronDown
-                            className={cn(
-                              "h-3.5 w-3.5 text-muted-foreground transition-transform",
-                              subIssuesCollapsed && "-rotate-90",
-                            )}
-                          />
-                          <span>Sub-issues</span>
-                        </button>
-                        <div className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2 py-0.5">
-                          <ProgressRing
-                            done={doneCount}
-                            total={childIssues.length}
-                            size={11}
-                          />
-                          <span className="text-[11px] text-muted-foreground tabular-nums font-medium">
-                            {doneCount}/{childIssues.length}
-                          </span>
-                        </div>
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <button
-                                type="button"
-                                className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                                onClick={() =>
-                                  useModalStore
-                                    .getState()
-                                    .open("create-issue", {
-                                      parent_issue_id: issue.id,
-                                      parent_issue_identifier: issue.identifier,
-                                    })
-                                }
-                                aria-label="Add sub-issue"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </button>
-                            }
-                          />
-                          <TooltipContent side="bottom">
-                            Add sub-issue
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-
-                      {/* List */}
-                      {!subIssuesCollapsed && (
-                        <div className="overflow-hidden rounded-lg border bg-card/30 divide-y divide-border/60">
-                          {childIssues.map((child) => {
-                            const isDone =
-                              child.status === "done" ||
-                              child.status === "cancelled";
-                            return (
-                              <AppLink
-                                key={child.id}
-                                href={paths.issueDetail(child.id)}
-                                className="flex items-center gap-2.5 px-3 py-2 hover:bg-accent/50 transition-colors group/row"
-                              >
-                                <StatusIcon
-                                  status={child.status}
-                                  className="h-[15px] w-[15px] shrink-0"
-                                />
-                                <span className="text-[11px] text-muted-foreground tabular-nums font-medium shrink-0">
-                                  {child.identifier}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "text-sm truncate flex-1",
-                                    isDone
-                                      ? "text-muted-foreground"
-                                      : "group-hover/row:text-foreground",
-                                  )}
-                                >
-                                  {child.title}
-                                </span>
-                                {child.assignee_type && child.assignee_id ? (
-                                  <ActorAvatar
-                                    actorType={child.assignee_type}
-                                    actorId={child.assignee_id}
-                                    size={20}
-                                    className="shrink-0"
-                                  />
-                                ) : (
-                                  <span
-                                    aria-hidden
-                                    className="h-5 w-5 rounded-full border border-dashed border-muted-foreground/30 shrink-0"
-                                  />
-                                )}
-                              </AppLink>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                    <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 shrink-0">
+                      <ProgressRing
+                        done={done}
+                        total={parentChildIssues.length}
+                        size={11}
+                      />
+                      <span className="tabular-nums text-[10.5px] font-medium">
+                        {done}/{parentChildIssues.length}
+                      </span>
+                    </span>
                   );
                 })()}
+            </AppLink>
+          )}
 
-              <div className="my-8 border-t" />
+          <div {...descDropZoneProps} className="relative mt-5 rounded-lg">
+            <ContentEditor
+              ref={descEditorRef}
+              key={id}
+              defaultValue={issue.description || ""}
+              placeholder="Add description..."
+              onUpdate={(md) => handleUpdateField({ description: md })}
+              onUploadFile={handleDescriptionUpload}
+              debounceMs={1500}
+              currentIssueId={id}
+            />
 
-              {/* Activity / Comments */}
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-base font-semibold">Activity</h2>
-                  </div>
-                  <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 mt-3">
+              <ReactionBar
+                reactions={issueReactions}
+                currentUserId={user?.id}
+                onToggle={handleToggleIssueReaction}
+                getActorName={getActorName}
+              />
+              <FileUploadButton
+                size="sm"
+                onSelect={(file) => descEditorRef.current?.uploadFile(file)}
+              />
+            </div>
+            {descDragOver && <FileDropOverlay />}
+          </div>
+
+          {/* Sub-issues — Linear-style */}
+          {childIssues.length === 0 && (
+            <div className="mt-6">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() =>
+                  useModalStore.getState().open("create-issue", {
+                    parent_issue_id: issue.id,
+                    parent_issue_identifier: issue.identifier,
+                  })
+                }
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add sub-issues</span>
+              </button>
+            </div>
+          )}
+          {childIssues.length > 0 &&
+            (() => {
+              const doneCount = childIssues.filter(
+                (c) => c.status === "done",
+              ).length;
+              return (
+                <div className="mt-10">
+                  {/* Header */}
+                  <div className="flex items-center gap-2 mb-2">
                     <button
-                      onClick={handleToggleSubscribe}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      type="button"
+                      onClick={() => setSubIssuesCollapsed((v) => !v)}
+                      className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-foreground/80 transition-colors"
                     >
-                      {isSubscribed ? "Unsubscribe" : "Subscribe"}
-                    </button>
-                    <Popover>
-                      <PopoverTrigger className="cursor-pointer hover:opacity-80 transition-opacity">
-                        {subscribers.length > 0 ? (
-                          <AvatarGroup>
-                            {subscribers.slice(0, 4).map((sub) => (
-                              <ActorAvatar
-                                key={`${sub.user_type}-${sub.user_id}`}
-                                actorType={sub.user_type}
-                                actorId={sub.user_id}
-                                size={24}
-                              />
-                            ))}
-                            {subscribers.length > 4 && (
-                              <AvatarGroupCount>
-                                +{subscribers.length - 4}
-                              </AvatarGroupCount>
-                            )}
-                          </AvatarGroup>
-                        ) : (
-                          <span className="flex items-center justify-center h-6 w-6 rounded-full border border-dashed border-muted-foreground/30 text-muted-foreground">
-                            <Users className="h-3 w-3" />
-                          </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 text-muted-foreground transition-transform",
+                          subIssuesCollapsed && "-rotate-90",
                         )}
-                      </PopoverTrigger>
-                      <PopoverContent align="end" className="w-64 p-0">
-                        <Command>
-                          <CommandInput placeholder="Change subscribers..." />
-                          <CommandList className="max-h-64">
-                            <CommandEmpty>No results found</CommandEmpty>
-                            {members.length > 0 && (
-                              <CommandGroup heading="Members">
-                                {members
-                                  .filter(
-                                    (m, i, arr) =>
-                                      arr.findIndex(
-                                        (x) => x.user_id === m.user_id,
-                                      ) === i,
-                                  )
-                                  .map((m) => {
-                                    const sub = subscribers.find(
-                                      (s) =>
-                                        s.user_type === "member" &&
-                                        s.user_id === m.user_id,
-                                    );
-                                    const isSubbed = !!sub;
-                                    return (
-                                      <CommandItem
-                                        key={`member-${m.user_id}`}
-                                        onSelect={() =>
-                                          toggleSubscriber(
-                                            m.user_id,
-                                            "member",
-                                            isSubbed,
-                                          )
-                                        }
-                                        className="flex items-center gap-2.5"
-                                      >
-                                        <Checkbox
-                                          checked={isSubbed}
-                                          className="pointer-events-none"
-                                        />
-                                        <ActorAvatar
-                                          actorType="member"
-                                          actorId={m.user_id}
-                                          size={22}
-                                        />
-                                        <span className="truncate flex-1">
-                                          {m.name}
-                                        </span>
-                                      </CommandItem>
-                                    );
-                                  })}
-                              </CommandGroup>
-                            )}
-                            {agents.filter((a) => !a.archived_at).length >
-                              0 && (
-                                <CommandGroup heading="Agents">
-                                  {agents
-                                    .filter((a) => !a.archived_at)
-                                    .map((a) => {
-                                      const sub = subscribers.find(
-                                        (s) =>
-                                          s.user_type === "agent" &&
-                                          s.user_id === a.id,
-                                      );
-                                      const isSubbed = !!sub;
-                                      return (
-                                        <CommandItem
-                                          key={`agent-${a.id}`}
-                                          onSelect={() =>
-                                            toggleSubscriber(
-                                              a.id,
-                                              "agent",
-                                              isSubbed,
-                                            )
-                                          }
-                                          className="flex items-center gap-2.5"
-                                        >
-                                          <Checkbox
-                                            checked={isSubbed}
-                                            className="pointer-events-none"
-                                          />
-                                          <ActorAvatar
-                                            actorType="agent"
-                                            actorId={a.id}
-                                            size={22}
-                                          />
-                                          <span className="truncate flex-1">
-                                            {a.name}
-                                          </span>
-                                        </CommandItem>
-                                      );
-                                    })}
-                                </CommandGroup>
-                              )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                      />
+                      <span>Sub-issues</span>
+                    </button>
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2 py-0.5">
+                      <ProgressRing
+                        done={doneCount}
+                        total={childIssues.length}
+                        size={11}
+                      />
+                      <span className="text-[11px] text-muted-foreground tabular-nums font-medium">
+                        {doneCount}/{childIssues.length}
+                      </span>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="button"
+                            className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                            onClick={() =>
+                              useModalStore
+                                .getState()
+                                .open("create-issue", {
+                                  parent_issue_id: issue.id,
+                                  parent_issue_identifier: issue.identifier,
+                                })
+                            }
+                            aria-label="Add sub-issue"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        }
+                      />
+                      <TooltipContent side="bottom">
+                        Add sub-issue
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                </div>
 
-                {/* Agent live output — sticky inside the Activity section so it
+                  {/* List */}
+                  {!subIssuesCollapsed && (
+                    <div className="overflow-hidden rounded-lg border bg-card/30 divide-y divide-border/60">
+                      {childIssues.map((child) => {
+                        const isDone =
+                          child.status === "done" ||
+                          child.status === "cancelled";
+                        return (
+                          <AppLink
+                            key={child.id}
+                            href={paths.issueDetail(child.id)}
+                            className="flex items-center gap-2.5 px-3 py-2 hover:bg-accent/50 transition-colors group/row"
+                          >
+                            <StatusIcon
+                              status={child.status}
+                              className="h-[15px] w-[15px] shrink-0"
+                            />
+                            <span className="text-[11px] text-muted-foreground tabular-nums font-medium shrink-0">
+                              {child.identifier}
+                            </span>
+                            <span
+                              className={cn(
+                                "text-sm truncate flex-1",
+                                isDone
+                                  ? "text-muted-foreground"
+                                  : "group-hover/row:text-foreground",
+                              )}
+                            >
+                              {child.title}
+                            </span>
+                            {child.assignee_type && child.assignee_id ? (
+                              <ActorAvatar
+                                actorType={child.assignee_type}
+                                actorId={child.assignee_id}
+                                size={20}
+                                className="shrink-0"
+                              />
+                            ) : (
+                              <span
+                                aria-hidden
+                                className="h-5 w-5 rounded-full border border-dashed border-muted-foreground/30 shrink-0"
+                              />
+                            )}
+                          </AppLink>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+          <div className="my-8 border-t" />
+
+          {/* Activity / Comments */}
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="text-base font-semibold">Activity</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleToggleSubscribe}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {isSubscribed ? "Unsubscribe" : "Subscribe"}
+                </button>
+                <Popover>
+                  <PopoverTrigger className="cursor-pointer hover:opacity-80 transition-opacity">
+                    {subscribers.length > 0 ? (
+                      <AvatarGroup>
+                        {subscribers.slice(0, 4).map((sub) => (
+                          <ActorAvatar
+                            key={`${sub.user_type}-${sub.user_id}`}
+                            actorType={sub.user_type}
+                            actorId={sub.user_id}
+                            size={24}
+                          />
+                        ))}
+                        {subscribers.length > 4 && (
+                          <AvatarGroupCount>
+                            +{subscribers.length - 4}
+                          </AvatarGroupCount>
+                        )}
+                      </AvatarGroup>
+                    ) : (
+                      <span className="flex items-center justify-center h-6 w-6 rounded-full border border-dashed border-muted-foreground/30 text-muted-foreground">
+                        <Users className="h-3 w-3" />
+                      </span>
+                    )}
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-64 p-0">
+                    <Command>
+                      <CommandInput placeholder="Change subscribers..." />
+                      <CommandList className="max-h-64">
+                        <CommandEmpty>No results found</CommandEmpty>
+                        {members.length > 0 && (
+                          <CommandGroup heading="Members">
+                            {members
+                              .filter(
+                                (m, i, arr) =>
+                                  arr.findIndex(
+                                    (x) => x.user_id === m.user_id,
+                                  ) === i,
+                              )
+                              .map((m) => {
+                                const sub = subscribers.find(
+                                  (s) =>
+                                    s.user_type === "member" &&
+                                    s.user_id === m.user_id,
+                                );
+                                const isSubbed = !!sub;
+                                return (
+                                  <CommandItem
+                                    key={`member-${m.user_id}`}
+                                    onSelect={() =>
+                                      toggleSubscriber(
+                                        m.user_id,
+                                        "member",
+                                        isSubbed,
+                                      )
+                                    }
+                                    className="flex items-center gap-2.5"
+                                  >
+                                    <Checkbox
+                                      checked={isSubbed}
+                                      className="pointer-events-none"
+                                    />
+                                    <ActorAvatar
+                                      actorType="member"
+                                      actorId={m.user_id}
+                                      size={22}
+                                    />
+                                    <span className="truncate flex-1">
+                                      {m.name}
+                                    </span>
+                                  </CommandItem>
+                                );
+                              })}
+                          </CommandGroup>
+                        )}
+                        {agents.filter((a) => !a.archived_at).length >
+                          0 && (
+                            <CommandGroup heading="Agents">
+                              {agents
+                                .filter((a) => !a.archived_at)
+                                .map((a) => {
+                                  const sub = subscribers.find(
+                                    (s) =>
+                                      s.user_type === "agent" &&
+                                      s.user_id === a.id,
+                                  );
+                                  const isSubbed = !!sub;
+                                  return (
+                                    <CommandItem
+                                      key={`agent-${a.id}`}
+                                      onSelect={() =>
+                                        toggleSubscriber(
+                                          a.id,
+                                          "agent",
+                                          isSubbed,
+                                        )
+                                      }
+                                      className="flex items-center gap-2.5"
+                                    >
+                                      <Checkbox
+                                        checked={isSubbed}
+                                        className="pointer-events-none"
+                                      />
+                                      <ActorAvatar
+                                        actorType="agent"
+                                        actorId={a.id}
+                                        size={22}
+                                      />
+                                      <span className="truncate flex-1">
+                                        {a.name}
+                                      </span>
+                                    </CommandItem>
+                                  );
+                                })}
+                            </CommandGroup>
+                          )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {/* Agent live output — sticky inside the Activity section so it
                 stays pinned while scrolling through TaskRunHistory + comments.
                 Keyed by issue id so switching issues remounts the card and
                 clears any in-flight task state from the previous issue. */}
-                <AgentLiveCard key={id} issueId={id} />
+            <AgentLiveCard key={id} issueId={id} />
 
-                {/* Timeline entries */}
-                <div className="mt-4 flex flex-col gap-3">
-                  {(() => {
-                    const topLevel = timeline.filter(
-                      (e) => e.type === "activity" || !e.parent_id,
+            {/* Timeline entries */}
+            <div className="mt-4 flex flex-col gap-3">
+              {(() => {
+                const topLevel = timeline.filter(
+                  (e) => e.type === "activity" || !e.parent_id,
+                );
+                const repliesByParent = new Map<string, TimelineEntry[]>();
+                for (const e of timeline) {
+                  if (e.type === "comment" && e.parent_id) {
+                    const list = repliesByParent.get(e.parent_id) ?? [];
+                    list.push(e);
+                    repliesByParent.set(e.parent_id, list);
+                  }
+                }
+
+                // Coalesce: same actor + same action within 2 min → keep last only
+                const COALESCE_MS = 2 * 60 * 1000;
+                const coalesced: TimelineEntry[] = [];
+                for (const entry of topLevel) {
+                  if (entry.type === "activity") {
+                    const prev = coalesced[coalesced.length - 1];
+                    if (
+                      prev?.type === "activity" &&
+                      prev.action === entry.action &&
+                      prev.actor_type === entry.actor_type &&
+                      prev.actor_id === entry.actor_id &&
+                      Math.abs(
+                        new Date(entry.created_at).getTime() -
+                        new Date(prev.created_at).getTime(),
+                      ) <= COALESCE_MS
+                    ) {
+                      // Replace previous with this one (keep the later result)
+                      coalesced[coalesced.length - 1] = entry;
+                      continue;
+                    }
+                  }
+                  coalesced.push(entry);
+                }
+
+                // Group consecutive activities together so the connector line works
+                const groups: {
+                  type: "activities" | "comment";
+                  entries: TimelineEntry[];
+                }[] = [];
+                for (const entry of coalesced) {
+                  if (entry.type === "activity") {
+                    const last = groups[groups.length - 1];
+                    if (last?.type === "activities") {
+                      last.entries.push(entry);
+                    } else {
+                      groups.push({ type: "activities", entries: [entry] });
+                    }
+                  } else {
+                    groups.push({ type: "comment", entries: [entry] });
+                  }
+                }
+
+                return groups.map((group) => {
+                  if (group.type === "comment") {
+                    const entry = group.entries[0]!;
+                    return (
+                      <div key={entry.id} id={`comment-${entry.id}`}>
+                        <CommentCard
+                          issueId={id}
+                          entry={entry}
+                          allReplies={repliesByParent}
+                          currentUserId={user?.id}
+                          canModerate={canModerateComments}
+                          onReply={submitReply}
+                          onEdit={editComment}
+                          onDelete={deleteComment}
+                          onToggleReaction={handleToggleReaction}
+                          highlightedCommentId={highlightedId}
+                        />
+                      </div>
                     );
-                    const repliesByParent = new Map<string, TimelineEntry[]>();
-                    for (const e of timeline) {
-                      if (e.type === "comment" && e.parent_id) {
-                        const list = repliesByParent.get(e.parent_id) ?? [];
-                        list.push(e);
-                        repliesByParent.set(e.parent_id, list);
-                      }
-                    }
+                  }
 
-                    // Coalesce: same actor + same action within 2 min → keep last only
-                    const COALESCE_MS = 2 * 60 * 1000;
-                    const coalesced: TimelineEntry[] = [];
-                    for (const entry of topLevel) {
-                      if (entry.type === "activity") {
-                        const prev = coalesced[coalesced.length - 1];
-                        if (
-                          prev?.type === "activity" &&
-                          prev.action === entry.action &&
-                          prev.actor_type === entry.actor_type &&
-                          prev.actor_id === entry.actor_id &&
-                          Math.abs(
-                            new Date(entry.created_at).getTime() -
-                            new Date(prev.created_at).getTime(),
-                          ) <= COALESCE_MS
-                        ) {
-                          // Replace previous with this one (keep the later result)
-                          coalesced[coalesced.length - 1] = entry;
-                          continue;
-                        }
-                      }
-                      coalesced.push(entry);
-                    }
+                  return (
+                    <div
+                      key={group.entries[0]!.id}
+                      className="px-4 flex flex-col gap-3"
+                    >
+                      {group.entries.map((entry, _idx) => {
+                        const details = (entry.details ?? {}) as Record<
+                          string,
+                          string
+                        >;
+                        const isStatusChange =
+                          entry.action === "status_changed";
+                        const isPriorityChange =
+                          entry.action === "priority_changed";
+                        const isDueDateChange =
+                          entry.action === "due_date_changed";
 
-                    // Group consecutive activities together so the connector line works
-                    const groups: {
-                      type: "activities" | "comment";
-                      entries: TimelineEntry[];
-                    }[] = [];
-                    for (const entry of coalesced) {
-                      if (entry.type === "activity") {
-                        const last = groups[groups.length - 1];
-                        if (last?.type === "activities") {
-                          last.entries.push(entry);
-                        } else {
-                          groups.push({ type: "activities", entries: [entry] });
-                        }
-                      } else {
-                        groups.push({ type: "comment", entries: [entry] });
-                      }
-                    }
-
-                    return groups.map((group) => {
-                      if (group.type === "comment") {
-                        const entry = group.entries[0]!;
-                        return (
-                          <div key={entry.id} id={`comment-${entry.id}`}>
-                            <CommentCard
-                              issueId={id}
-                              entry={entry}
-                              allReplies={repliesByParent}
-                              currentUserId={user?.id}
-                              onReply={submitReply}
-                              onEdit={editComment}
-                              onDelete={deleteComment}
-                              onToggleReaction={handleToggleReaction}
-                              highlightedCommentId={highlightedId}
+                        let leadIcon: React.ReactNode;
+                        if (isStatusChange && details.to) {
+                          leadIcon = (
+                            <StatusIcon
+                              status={details.to as IssueStatus}
+                              className="h-4 w-4 shrink-0"
                             />
+                          );
+                        } else if (isPriorityChange && details.to) {
+                          leadIcon = (
+                            <PriorityIcon
+                              priority={details.to as IssuePriority}
+                              className="h-4 w-4 shrink-0"
+                            />
+                          );
+                        } else if (isDueDateChange) {
+                          leadIcon = (
+                            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          );
+                        } else {
+                          leadIcon = (
+                            <ActorAvatar
+                              actorType={entry.actor_type}
+                              actorId={entry.actor_id}
+                              size={16}
+                            />
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={entry.id}
+                            className="flex items-center text-xs text-muted-foreground"
+                          >
+                            <div className="mr-2 flex w-4 shrink-0 justify-center">
+                              {leadIcon}
+                            </div>
+                            <div className="flex min-w-0 flex-1 items-center gap-1">
+                              <span className="shrink-0 font-medium">
+                                {getActorName(
+                                  entry.actor_type,
+                                  entry.actor_id,
+                                )}
+                              </span>
+                              <span className="truncate">
+                                {formatActivity(entry, getActorName)}
+                              </span>
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <span className="ml-auto shrink-0 cursor-default">
+                                      {timeAgo(entry.created_at)}
+                                    </span>
+                                  }
+                                />
+                                <TooltipContent side="top">
+                                  {new Date(
+                                    entry.created_at,
+                                  ).toLocaleString()}
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           </div>
                         );
-                      }
+                      })}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
 
-                      return (
-                        <div
-                          key={group.entries[0]!.id}
-                          className="px-4 flex flex-col gap-3"
-                        >
-                          {group.entries.map((entry, _idx) => {
-                            const details = (entry.details ?? {}) as Record<
-                              string,
-                              string
-                            >;
-                            const isStatusChange =
-                              entry.action === "status_changed";
-                            const isPriorityChange =
-                              entry.action === "priority_changed";
-                            const isDueDateChange =
-                              entry.action === "due_date_changed";
-
-                            let leadIcon: React.ReactNode;
-                            if (isStatusChange && details.to) {
-                              leadIcon = (
-                                <StatusIcon
-                                  status={details.to as IssueStatus}
-                                  className="h-4 w-4 shrink-0"
-                                />
-                              );
-                            } else if (isPriorityChange && details.to) {
-                              leadIcon = (
-                                <PriorityIcon
-                                  priority={details.to as IssuePriority}
-                                  className="h-4 w-4 shrink-0"
-                                />
-                              );
-                            } else if (isDueDateChange) {
-                              leadIcon = (
-                                <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              );
-                            } else {
-                              leadIcon = (
-                                <ActorAvatar
-                                  actorType={entry.actor_type}
-                                  actorId={entry.actor_id}
-                                  size={16}
-                                />
-                              );
-                            }
-
-                            return (
-                              <div
-                                key={entry.id}
-                                className="flex items-center text-xs text-muted-foreground"
-                              >
-                                <div className="mr-2 flex w-4 shrink-0 justify-center">
-                                  {leadIcon}
-                                </div>
-                                <div className="flex min-w-0 flex-1 items-center gap-1">
-                                  <span className="shrink-0 font-medium">
-                                    {getActorName(
-                                      entry.actor_type,
-                                      entry.actor_id,
-                                    )}
-                                  </span>
-                                  <span className="truncate">
-                                    {formatActivity(entry, getActorName)}
-                                  </span>
-                                  <Tooltip>
-                                    <TooltipTrigger
-                                      render={
-                                        <span className="ml-auto shrink-0 cursor-default">
-                                          {timeAgo(entry.created_at)}
-                                        </span>
-                                      }
-                                    />
-                                    <TooltipContent side="top">
-                                      {new Date(
-                                        entry.created_at,
-                                      ).toLocaleString()}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-
-                {/* Bottom comment input — no avatar, full width */}
-                <div className="mt-4">
-                  <CommentInput issueId={id} onSubmit={submitComment} />
-                </div>
-              </div>
+            {/* Bottom comment input — no avatar, full width */}
+            <div className="mt-4">
+              <CommentInput issueId={id} onSubmit={submitComment} />
             </div>
           </div>
         </div>
-      </ResizablePanel>
-      {!isMobile && <ResizableHandle />}
-      {!isMobile && (
-        <ResizablePanel
-          id="sidebar"
-          defaultSize={defaultSidebarOpen ? 320 : 0}
-          minSize={260}
-          maxSize={420}
-          collapsible
-          groupResizeBehavior="preserve-pixel-size"
-          panelRef={sidebarRef}
-          onResize={(size) => setSidebarOpen(size.inPixels > 0)}
-        >
-          <div className="overflow-y-auto border-l h-full">
-            <div className="p-4">{sidebarContent}</div>
-          </div>
-        </ResizablePanel>
-      )}
-      {isMobile && (
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent
-            side="right"
-            showCloseButton={false}
-            className="w-[320px] overflow-y-auto p-4"
-          >
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-1 min-h-0">
+        {detailContent}
+        <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+          <SheetContent side="right" showCloseButton={false} className="w-[320px] overflow-y-auto p-4">
             {sidebarContent}
           </SheetContent>
         </Sheet>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
+      <ResizablePanel id="content" minSize="50%">
+        {detailContent}
+      </ResizablePanel>
+      <ResizableHandle />
+      <ResizablePanel
+        id="sidebar"
+        defaultSize={defaultSidebarOpen ? 320 : 0}
+        minSize={260}
+        maxSize={420}
+        collapsible
+        groupResizeBehavior="preserve-pixel-size"
+        panelRef={sidebarRef}
+        onResize={(size) => setDesktopSidebarOpen(size.inPixels > 0)}
+      >
+        <div className="overflow-y-auto border-l h-full">
+          <div className="p-4">
+            {sidebarContent}
+          </div>
+        </div>
+      </ResizablePanel>
     </ResizablePanelGroup>
   );
 }
