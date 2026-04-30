@@ -126,6 +126,11 @@ export const appRoutes: RouteObject[] = [
             handle: { title: "Time Tracking" },
           },
           {
+            path: "time-tracking/calendar",
+            element: <TimeTrackingDashboard />,
+            handle: { title: "Time Tracking" },
+          },
+          {
             path: "runtimes",
             element: <DesktopRuntimesPage />,
             handle: { title: "Runtimes" },

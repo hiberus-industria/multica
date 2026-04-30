@@ -34,6 +34,7 @@ function workspaceScoped(slug: string) {
     skillDetail: (id: string) => `${ws}/skills/${encode(id)}`,
     settings: () => `${ws}/settings`,
     timeTracking: () => `${ws}/time-tracking`,
+    timeTrackingCalendar: () => `${ws}/time-tracking/calendar`,
   };
 }
 

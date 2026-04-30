@@ -28,6 +28,7 @@ import {
 } from "@multica/ui/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell } from "recharts";
 import type { TimeEntrySyncStatus } from "@multica/core/types";
+import { MonthlyCalendarView } from "./monthly-calendar";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -192,17 +193,65 @@ function EmptyState() {
   );
 }
 
+// ─── View mode segment ───────────────────────────────────────────────────────
+
+type ViewMode = "weekly" | "monthly";
+
+function ViewSegment({
+  mode,
+  setMode,
+}: {
+  mode: ViewMode;
+  setMode: (v: ViewMode) => void;
+}) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-md bg-muted p-0.5">
+      <button
+        type="button"
+        onClick={() => setMode("weekly")}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
+          mode === "weekly"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        Weekly
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("monthly")}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
+          mode === "monthly"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        Monthly
+      </button>
+    </div>
+  );
+}
+
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 export function TimeTrackingDashboard() {
   const wsId = useWorkspaceId();
+  const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [weekOffset, setWeekOffset] = useState(0);
+
+  // Month state
+  const now = new Date();
+  const [monthYear, setMonthYear] = useState(now.getFullYear());
+  const [monthIdx, setMonthIdx] = useState(now.getMonth());
 
   const range = useMemo(() => getWeekRange(weekOffset), [weekOffset]);
 
-  const { data, isLoading } = useQuery(
-    dashboardOptions(wsId, range.start, range.end),
-  );
+  const { data, isLoading } = useQuery({
+    ...dashboardOptions(wsId, range.start, range.end),
+    enabled: viewMode === "weekly",
+  });
 
   // Today's day index (Mon=0..Sun=6), only relevant when viewing current week
   const todayDayIdx = useMemo(() => {
@@ -302,47 +351,119 @@ export function TimeTrackingDashboard() {
     };
   }, [data]);
 
+  // Month navigation helpers
+  const isCurrentMonth =
+    monthYear === now.getFullYear() && monthIdx === now.getMonth();
+  const monthLabel = new Date(monthYear, monthIdx, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  function goToPreviousMonth() {
+    if (monthIdx === 0) {
+      setMonthYear((y) => y - 1);
+      setMonthIdx(11);
+    } else {
+      setMonthIdx((m) => m - 1);
+    }
+  }
+
+  function goToNextMonth() {
+    if (monthIdx === 11) {
+      setMonthYear((y) => y + 1);
+      setMonthIdx(0);
+    } else {
+      setMonthIdx((m) => m + 1);
+    }
+  }
+
+  function goToCurrentMonth() {
+    setMonthYear(now.getFullYear());
+    setMonthIdx(now.getMonth());
+  }
+
   return (
     <div className="flex flex-1 min-h-0 flex-col">
       {/* Header */}
       <PageHeader className="justify-between px-5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Clock className="size-4 text-muted-foreground" />
           <span className="text-sm font-medium">Time Tracking</span>
+          <ViewSegment mode={viewMode} setMode={setViewMode} />
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            onClick={() => setWeekOffset((w) => w - 1)}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-7 min-w-27 justify-center text-xs",
-              weekOffset !== 0 && "text-muted-foreground",
-            )}
-            onClick={() => setWeekOffset(0)}
-          >
-            {range.label}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            onClick={() => setWeekOffset((w) => w + 1)}
-            disabled={weekOffset >= 0}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
+          {viewMode === "weekly" ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => setWeekOffset((w) => w - 1)}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-7 min-w-27 justify-center text-xs",
+                  weekOffset !== 0 && "text-muted-foreground",
+                )}
+                onClick={() => setWeekOffset(0)}
+              >
+                {range.label}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => setWeekOffset((w) => w + 1)}
+                disabled={weekOffset >= 0}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={goToPreviousMonth}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-7 min-w-36 justify-center text-xs",
+                  !isCurrentMonth && "text-muted-foreground",
+                )}
+                onClick={goToCurrentMonth}
+              >
+                {monthLabel}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={goToNextMonth}
+                disabled={isCurrentMonth}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </>
+          )}
         </div>
       </PageHeader>
 
-      {!isLoading && (!data || data.total_minutes === 0) ? (
+      {/* Content */}
+      {viewMode === "monthly" ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <MonthlyCalendarView year={monthYear} month={monthIdx} />
+        </div>
+      ) : !isLoading && (!data || data.total_minutes === 0) ? (
         <EmptyState />
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">
