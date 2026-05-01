@@ -13,6 +13,7 @@ import {
   Loader2,
   MinusCircle,
   RefreshCw,
+  Bot,
 } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
@@ -465,7 +466,8 @@ export function IssueTimeSection({
                 const sync =
                   SYNC_ICONS[entry.sync_status] ?? SYNC_ICONS.not_linked!;
                 const SyncIcon = sync.icon;
-                const isOwn = entry.user_id === currentUser?.id;
+                const isAgent = entry.author_type === "agent";
+                const isOwn = !isAgent && entry.user_id === currentUser?.id;
                 const isEditing = editingId === entry.id;
 
                 if (isEditing) {
@@ -550,11 +552,24 @@ export function IssueTimeSection({
                 return (
                   <div
                     key={entry.id}
-                    className="group flex items-center gap-1.5 rounded-md px-2 py-1 -mx-2 hover:bg-accent/50 transition-colors text-[11px]"
+                    className={cn(
+                      "group flex items-center gap-1.5 rounded-md px-2 py-1 -mx-2 hover:bg-accent/50 transition-colors text-[11px]",
+                      isAgent && "border-l-2 border-violet-500/50 pl-1.5"
+                    )}
                   >
+                    {isAgent && (
+                      <span className="shrink-0 text-violet-500" title={entry.agent_name ?? "Agent"}>
+                        <Bot className="size-3" />
+                      </span>
+                    )}
                     <span className="font-medium tabular-nums shrink-0">
                       {formatMinutes(entry.duration_minutes)}
                     </span>
+                    {isAgent && entry.agent_name && (
+                      <span className="text-violet-400/70 text-[10px] shrink-0">
+                        by {entry.agent_name}
+                      </span>
+                    )}
                     {entry.activity_name && (
                       <>
                         <span className="text-muted-foreground">·</span>

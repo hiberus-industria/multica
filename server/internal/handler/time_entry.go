@@ -31,6 +31,12 @@ type TimeEntryResponse struct {
 	TimerStartedAt      *string `json:"timer_started_at"`
 	TimerStoppedAt      *string `json:"timer_stopped_at"`
 	CreatedAt           string  `json:"created_at"`
+	// Agent author fields
+	AuthorType     string  `json:"author_type"`
+	AgentID        *string `json:"agent_id"`
+	AgentName      *string `json:"agent_name"`
+	AgentAvatarURL *string `json:"agent_avatar_url"`
+	AgentTaskID    *string `json:"agent_task_id"`
 }
 
 func timeEntryToResponse(t db.TimeEntry) TimeEntryResponse {
@@ -46,6 +52,20 @@ func timeEntryToResponse(t db.TimeEntry) TimeEntryResponse {
 	if t.SpentOn.Valid {
 		spentOn = t.SpentOn.Time.Format("2006-01-02")
 	}
+	authorType := t.AuthorType
+	if authorType == "" {
+		authorType = "user"
+	}
+	var agentID *string
+	if t.AgentID.Valid {
+		s := uuidToString(t.AgentID)
+		agentID = &s
+	}
+	var agentTaskID *string
+	if t.AgentTaskID.Valid {
+		s := uuidToString(t.AgentTaskID)
+		agentTaskID = &s
+	}
 	return TimeEntryResponse{
 		ID:                  uuidToString(t.ID),
 		IssueID:             uuidToString(t.IssueID),
@@ -60,6 +80,123 @@ func timeEntryToResponse(t db.TimeEntry) TimeEntryResponse {
 		TimerStartedAt:      timestampToPtr(t.TimerStartedAt),
 		TimerStoppedAt:      timestampToPtr(t.TimerStoppedAt),
 		CreatedAt:           timestampToString(t.CreatedAt),
+		AuthorType:          authorType,
+		AgentID:             agentID,
+		AgentTaskID:         agentTaskID,
+	}
+}
+
+func timeEntryGetRowToResponse(t db.GetTimeEntryRow) TimeEntryResponse {
+	var activityName *string
+	if t.ActivityName.Valid {
+		activityName = &t.ActivityName.String
+	}
+	var activityID *int32
+	if t.RedmineActivityID.Valid {
+		activityID = &t.RedmineActivityID.Int32
+	}
+	spentOn := ""
+	if t.SpentOn.Valid {
+		spentOn = t.SpentOn.Time.Format("2006-01-02")
+	}
+	authorType := t.AuthorType
+	if authorType == "" {
+		authorType = "user"
+	}
+	var agentID *string
+	if t.AgentID.Valid {
+		s := uuidToString(t.AgentID)
+		agentID = &s
+	}
+	var agentTaskID *string
+	if t.AgentTaskID.Valid {
+		s := uuidToString(t.AgentTaskID)
+		agentTaskID = &s
+	}
+	var agentName *string
+	if t.AgentName.Valid {
+		agentName = &t.AgentName.String
+	}
+	var agentAvatarURL *string
+	if t.AgentAvatarUrl.Valid {
+		agentAvatarURL = &t.AgentAvatarUrl.String
+	}
+	return TimeEntryResponse{
+		ID:                  uuidToString(t.ID),
+		IssueID:             uuidToString(t.IssueID),
+		UserID:              uuidToString(t.UserID),
+		DurationMinutes:     t.DurationMinutes,
+		ActivityName:        activityName,
+		RedmineActivityID:   activityID,
+		Comment:             t.Comment,
+		SpentOn:             spentOn,
+		ExternalTimeEntryID: textToPtr(t.ExternalTimeEntryID),
+		SyncStatus:          t.SyncStatus,
+		TimerStartedAt:      timestampToPtr(t.TimerStartedAt),
+		TimerStoppedAt:      timestampToPtr(t.TimerStoppedAt),
+		CreatedAt:           timestampToString(t.CreatedAt),
+		AuthorType:          authorType,
+		AgentID:             agentID,
+		AgentName:           agentName,
+		AgentAvatarURL:      agentAvatarURL,
+		AgentTaskID:         agentTaskID,
+	}
+}
+
+func timeEntryListRowToResponse(t db.ListTimeEntriesByIssueRow) TimeEntryResponse {
+	var activityName *string
+	if t.ActivityName.Valid {
+		activityName = &t.ActivityName.String
+	}
+	var activityID *int32
+	if t.RedmineActivityID.Valid {
+		activityID = &t.RedmineActivityID.Int32
+	}
+	spentOn := ""
+	if t.SpentOn.Valid {
+		spentOn = t.SpentOn.Time.Format("2006-01-02")
+	}
+	authorType := t.AuthorType
+	if authorType == "" {
+		authorType = "user"
+	}
+	var agentID *string
+	if t.AgentID.Valid {
+		s := uuidToString(t.AgentID)
+		agentID = &s
+	}
+	var agentTaskID *string
+	if t.AgentTaskID.Valid {
+		s := uuidToString(t.AgentTaskID)
+		agentTaskID = &s
+	}
+	var agentName *string
+	if t.AgentName.Valid {
+		agentName = &t.AgentName.String
+	}
+	var agentAvatarURL *string
+	if t.AgentAvatarUrl.Valid {
+		agentAvatarURL = &t.AgentAvatarUrl.String
+	}
+	return TimeEntryResponse{
+		ID:                  uuidToString(t.ID),
+		IssueID:             uuidToString(t.IssueID),
+		UserID:              uuidToString(t.UserID),
+		DurationMinutes:     t.DurationMinutes,
+		ActivityName:        activityName,
+		RedmineActivityID:   activityID,
+		Comment:             t.Comment,
+		SpentOn:             spentOn,
+		ExternalTimeEntryID: textToPtr(t.ExternalTimeEntryID),
+		SyncStatus:          t.SyncStatus,
+		TimerStartedAt:      timestampToPtr(t.TimerStartedAt),
+		TimerStoppedAt:      timestampToPtr(t.TimerStoppedAt),
+		CreatedAt:           timestampToString(t.CreatedAt),
+		AuthorType:          authorType,
+		AgentID:             agentID,
+		AgentName:           agentName,
+		AgentAvatarURL:      agentAvatarURL,
+		AgentTaskID:         agentTaskID,
 	}
 }
 
@@ -157,13 +294,17 @@ func (h *Handler) CreateTimeEntry(w http.ResponseWriter, r *http.Request) {
 	// Try to sync to Redmine
 	h.syncTimeEntryToRedmine(r, workspaceID, userID, issueID, entry)
 
-	// Re-read to get updated sync_status
-	entry, _ = h.Queries.GetTimeEntry(r.Context(), db.GetTimeEntryParams{
+	// Re-read to get updated sync_status (also fetches joined agent fields)
+	entryRow, err2 := h.Queries.GetTimeEntry(r.Context(), db.GetTimeEntryParams{
 		ID:          entry.ID,
 		WorkspaceID: entry.WorkspaceID,
 	})
-
-	resp := timeEntryToResponse(entry)
+	var resp TimeEntryResponse
+	if err2 == nil {
+		resp = timeEntryGetRowToResponse(entryRow)
+	} else {
+		resp = timeEntryToResponse(entry)
+	}
 
 	// Publish event
 	h.publish(protocol.EventTimeEntryCreated, workspaceID, "member", userID, map[string]any{
@@ -304,7 +445,7 @@ func (h *Handler) ListTimeEntries(w http.ResponseWriter, r *http.Request) {
 
 	resp := make([]TimeEntryResponse, len(entries))
 	for i, e := range entries {
-		resp[i] = timeEntryToResponse(e)
+		resp[i] = timeEntryListRowToResponse(e)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"time_entries":  resp,
@@ -312,7 +453,7 @@ func (h *Handler) ListTimeEntries(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// DeleteTimeEntry deletes a time entry (own entries only) and removes it from Redmine if synced.
+// DeleteTimeEntry deletes a time entry (own entries only, or admin for agent entries).
 func (h *Handler) DeleteTimeEntry(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {
@@ -330,7 +471,13 @@ func (h *Handler) DeleteTimeEntry(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "time entry not found")
 		return
 	}
-	if uuidToString(entry.UserID) != userID {
+
+	if entry.AuthorType == "agent" {
+		// Agent entries can only be deleted by workspace admins/owners
+		if _, ok := h.requireWorkspaceRole(w, r, workspaceID, "time entry not found", "owner", "admin"); !ok {
+			return
+		}
+	} else if uuidToString(entry.UserID) != userID {
 		writeError(w, http.StatusForbidden, "can only delete your own time entries")
 		return
 	}
@@ -361,7 +508,7 @@ func (h *Handler) DeleteTimeEntry(w http.ResponseWriter, r *http.Request) {
 }
 
 // tryDeleteRedmineTimeEntry attempts to delete a time entry from Redmine. Best-effort.
-func (h *Handler) tryDeleteRedmineTimeEntry(r *http.Request, workspaceID, userID string, entry db.TimeEntry) {
+func (h *Handler) tryDeleteRedmineTimeEntry(r *http.Request, workspaceID, userID string, entry db.GetTimeEntryRow) {
 	integration, err := h.Queries.GetWorkspaceIntegration(r.Context(), db.GetWorkspaceIntegrationParams{
 		WorkspaceID: parseUUID(workspaceID),
 		Provider:    "redmine",
@@ -403,7 +550,7 @@ func (h *Handler) ListRedmineActivities(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"activities": activities})
 }
 
-// UpdateTimeEntry updates a time entry (own entries only) and re-syncs to Redmine if synced.
+// UpdateTimeEntry updates a time entry (own entries only, or admin for agent entries).
 func (h *Handler) UpdateTimeEntry(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {
@@ -420,7 +567,13 @@ func (h *Handler) UpdateTimeEntry(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "time entry not found")
 		return
 	}
-	if uuidToString(entry.UserID) != userID {
+
+	if entry.AuthorType == "agent" {
+		// Agent entries can only be edited by workspace admins/owners
+		if _, ok := h.requireWorkspaceRole(w, r, workspaceID, "time entry not found", "owner", "admin"); !ok {
+			return
+		}
+	} else if uuidToString(entry.UserID) != userID {
 		writeError(w, http.StatusForbidden, "can only edit your own time entries")
 		return
 	}
@@ -742,4 +895,103 @@ func (h *Handler) TimeTrackingDashboard(w http.ResponseWriter, r *http.Request) 
 		"by_issue":      issueResp,
 		"entries":       entryResp,
 	})
+}
+
+// CreateAgentTimeEntry creates a time entry on behalf of an agent for the given task.
+// Route: POST /api/daemon/tasks/{taskId}/time-entries
+func (h *Handler) CreateAgentTimeEntry(w http.ResponseWriter, r *http.Request) {
+taskID := chi.URLParam(r, "taskId")
+task, ok := h.requireDaemonTaskAccess(w, r, taskID)
+if !ok {
+return
+}
+if !task.IssueID.Valid {
+writeError(w, http.StatusBadRequest, "task is not associated with an issue")
+return
+}
+
+var req struct {
+IssueID         string  `json:"issue_id"`
+DurationMinutes int32   `json:"duration_minutes"`
+ActivityName    *string `json:"activity_name"`
+Comment         *string `json:"comment"`
+SpentOn         *string `json:"spent_on"`
+}
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+writeError(w, http.StatusBadRequest, "invalid request body")
+return
+}
+if req.DurationMinutes < 1 {
+writeError(w, http.StatusBadRequest, "duration_minutes must be at least 1")
+return
+}
+
+wsID := h.TaskService.ResolveTaskWorkspaceID(r.Context(), task)
+if wsID == "" {
+writeError(w, http.StatusInternalServerError, "could not resolve workspace")
+return
+}
+
+// Idempotency: if a time entry already exists for this task, return it
+existing, err := h.Queries.GetTimeEntryByAgentTaskID(r.Context(), db.GetTimeEntryByAgentTaskIDParams{
+AgentTaskID: task.ID,
+WorkspaceID: parseUUID(wsID),
+})
+if err == nil {
+writeJSON(w, http.StatusOK, timeEntryToResponse(existing))
+return
+}
+
+// Use the task's issue if no explicit issue_id override
+issueID := task.IssueID
+if req.IssueID != "" {
+issueID = parseUUID(req.IssueID)
+}
+
+var spentOn pgtype.Date
+if req.SpentOn != nil && *req.SpentOn != "" {
+t, err := time.Parse("2006-01-02", *req.SpentOn)
+if err != nil {
+writeError(w, http.StatusBadRequest, "invalid spent_on date format, use YYYY-MM-DD")
+return
+}
+spentOn = pgtype.Date{Time: t, Valid: true}
+} else {
+spentOn = pgtype.Date{Time: time.Now(), Valid: true}
+}
+
+comment := "Auto-logged by Multica agent"
+if req.Comment != nil && *req.Comment != "" {
+comment = *req.Comment
+}
+
+var activityName pgtype.Text
+if req.ActivityName != nil {
+activityName = strToText(*req.ActivityName)
+}
+
+entry, err := h.Queries.CreateAgentTimeEntry(r.Context(), db.CreateAgentTimeEntryParams{
+WorkspaceID:     parseUUID(wsID),
+IssueID:         issueID,
+AgentID:         task.AgentID,
+AgentTaskID:     pgtype.UUID{Bytes: task.ID.Bytes, Valid: true},
+DurationMinutes: req.DurationMinutes,
+ActivityName:    activityName,
+Comment:         comment,
+SpentOn:         spentOn,
+})
+if err != nil {
+slog.Error("failed to create agent time entry", "error", err)
+writeError(w, http.StatusInternalServerError, "failed to create time entry")
+return
+}
+
+resp := timeEntryToResponse(entry)
+
+h.publish(protocol.EventTimeEntryCreated, wsID, "agent", uuidToString(task.AgentID), map[string]any{
+"issue_id":   uuidToString(issueID),
+"time_entry": resp,
+})
+
+writeJSON(w, http.StatusCreated, resp)
 }

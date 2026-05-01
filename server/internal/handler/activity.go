@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sort"
 
@@ -11,14 +12,16 @@ import (
 )
 
 // TimelineEntry represents a single entry in the issue timeline, which can be
-// either an activity log record or a comment.
+// an activity log record, a comment, or a time entry.
 type TimelineEntry struct {
-	Type string `json:"type"` // "activity" or "comment"
+	Type string `json:"type"` // "activity", "comment", or "time_entry"
 	ID   string `json:"id"`
 
-	ActorType string `json:"actor_type"`
-	ActorID   string `json:"actor_id"`
-	CreatedAt string `json:"created_at"`
+	ActorType      string  `json:"actor_type"`
+	ActorID        string  `json:"actor_id"`
+	ActorName      *string `json:"actor_name,omitempty"`
+	ActorAvatarURL *string `json:"actor_avatar_url,omitempty"`
+	CreatedAt      string  `json:"created_at"`
 
 	// Activity-only fields
 	Action  *string         `json:"action,omitempty"`
@@ -31,6 +34,12 @@ type TimelineEntry struct {
 	CommentType *string              `json:"comment_type,omitempty"`
 	Reactions   []ReactionResponse   `json:"reactions,omitempty"`
 	Attachments []AttachmentResponse `json:"attachments,omitempty"`
+
+	// Time entry fields
+	DurationMinutes  *int32  `json:"duration_minutes,omitempty"`
+	ActivityName     *string `json:"activity_name,omitempty"`
+	TimeEntryComment *string `json:"time_entry_comment,omitempty"`
+	AgentTaskID      *string `json:"agent_task_id,omitempty"`
 }
 
 // ListTimeline returns a merged, chronologically-sorted timeline of activities
@@ -105,6 +114,63 @@ func (h *Handler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt:   &updatedAt,
 			Reactions:   grouped[cid],
 			Attachments: groupedAtt[cid],
+		})
+	}
+
+	// Fetch time entries for this issue
+	timeEntries, err := h.Queries.ListTimeEntriesByIssue(r.Context(), db.ListTimeEntriesByIssueParams{
+		WorkspaceID: issue.WorkspaceID,
+		IssueID:     issue.ID,
+	})
+	if err != nil {
+		slog.Error("failed to list time entries for timeline", "error", err)
+		timeEntries = nil
+	}
+
+	for _, te := range timeEntries {
+		actorType := te.AuthorType
+		actorID := ""
+		var actorName *string
+		var actorAvatarURL *string
+		if te.AuthorType == "agent" && te.AgentID.Valid {
+			actorID = uuidToString(te.AgentID)
+			if te.AgentName.Valid {
+				s := te.AgentName.String
+				actorName = &s
+			}
+			if te.AgentAvatarUrl.Valid {
+				s := te.AgentAvatarUrl.String
+				actorAvatarURL = &s
+			}
+		} else if te.UserID.Valid {
+			actorID = uuidToString(te.UserID)
+		}
+
+		durationMinutes := te.DurationMinutes
+		var activityName *string
+		if te.ActivityName.Valid {
+			s := te.ActivityName.String
+			activityName = &s
+		}
+		comment := te.Comment
+		var agentTaskID *string
+		if te.AgentTaskID.Valid {
+			s := uuidToString(te.AgentTaskID)
+			agentTaskID = &s
+		}
+
+		timeline = append(timeline, TimelineEntry{
+			Type:             "time_entry",
+			ID:               uuidToString(te.ID),
+			ActorType:        actorType,
+			ActorID:          actorID,
+			ActorName:        actorName,
+			ActorAvatarURL:   actorAvatarURL,
+			CreatedAt:        timestampToString(te.CreatedAt),
+			DurationMinutes:  &durationMinutes,
+			ActivityName:     activityName,
+			TimeEntryComment: &comment,
+			AgentTaskID:      agentTaskID,
 		})
 	}
 

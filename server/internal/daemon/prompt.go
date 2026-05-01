@@ -26,7 +26,13 @@ func BuildPrompt(task Task) string {
 	var b strings.Builder
 	b.WriteString("You are running as a local coding agent for a Multica workspace.\n\n")
 	fmt.Fprintf(&b, "Your assigned issue ID is: %s\n\n", task.IssueID)
-	fmt.Fprintf(&b, "Start by running `multica issue get %s --output json` to understand your task, then complete it.\n", task.IssueID)
+	fmt.Fprintf(&b, "Start by running `multica issue get %s --output json` to understand your task, then complete it.\n\n", task.IssueID)
+	b.WriteString("Time tracking:\n")
+	b.WriteString("- Your active work time is automatically logged when this task completes.\n")
+	b.WriteString("- To log time for sub-tasks or specific work items, use:\n")
+	b.WriteString("    multica time log <issue-id> --duration 30m --comment \"brief description of work done\"\n")
+	b.WriteString("  Optional: --activity \"<Redmine activity name>\" to categorize the time.\n")
+	b.WriteString("- Always add a descriptive comment so the time entry is meaningful in the timeline.\n")
 	return b.String()
 }
 

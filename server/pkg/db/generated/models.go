@@ -463,6 +463,9 @@ type TimeEntry struct {
 	TimerStoppedAt      pgtype.Timestamptz `json:"timer_stopped_at"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	AuthorType          string             `json:"author_type"`
+	AgentID             pgtype.UUID        `json:"agent_id"`
+	AgentTaskID         pgtype.UUID        `json:"agent_task_id"`
 }
 
 type User struct {

@@ -8,10 +8,13 @@ export interface AssigneeFrequencyEntry {
 }
 
 export interface TimelineEntry {
-  type: "activity" | "comment";
+  type: "activity" | "comment" | "time_entry";
   id: string;
   actor_type: string;
   actor_id: string;
+  // Actor name/avatar (populated for agent entries and comments)
+  actor_name?: string;
+  actor_avatar_url?: string | null;
   created_at: string;
   // Activity fields
   action?: string;
@@ -23,4 +26,9 @@ export interface TimelineEntry {
   comment_type?: string;
   reactions?: Reaction[];
   attachments?: Attachment[];
+  // Time entry fields (when type === "time_entry")
+  duration_minutes?: number;
+  activity_name?: string | null;
+  time_entry_comment?: string | null;
+  agent_task_id?: string | null;
 }

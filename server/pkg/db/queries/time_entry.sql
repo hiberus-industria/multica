@@ -7,13 +7,21 @@ INSERT INTO time_entry (
 RETURNING *;
 
 -- name: GetTimeEntry :one
-SELECT * FROM time_entry
-WHERE id = $1 AND workspace_id = $2;
+SELECT te.*,
+       a.name         AS agent_name,
+       a.avatar_url   AS agent_avatar_url
+FROM time_entry te
+LEFT JOIN agent a ON a.id = te.agent_id
+WHERE te.id = $1 AND te.workspace_id = $2;
 
 -- name: ListTimeEntriesByIssue :many
-SELECT * FROM time_entry
-WHERE workspace_id = $1 AND issue_id = $2
-ORDER BY spent_on DESC, created_at DESC;
+SELECT te.*,
+       a.name         AS agent_name,
+       a.avatar_url   AS agent_avatar_url
+FROM time_entry te
+LEFT JOIN agent a ON a.id = te.agent_id
+WHERE te.workspace_id = $1 AND te.issue_id = $2
+ORDER BY te.spent_on DESC, te.created_at DESC;
 
 -- name: ListTimeEntriesByUser :many
 SELECT * FROM time_entry
@@ -92,3 +100,14 @@ ORDER BY total_minutes DESC;
 SELECT COALESCE(SUM(duration_minutes), 0)::int AS total_minutes
 FROM time_entry
 WHERE workspace_id = $1 AND user_id = $2 AND spent_on = $3;
+
+-- name: CreateAgentTimeEntry :one
+INSERT INTO time_entry (
+    workspace_id, issue_id, agent_id, agent_task_id, author_type,
+    duration_minutes, activity_name, comment, spent_on, sync_status
+) VALUES ($1, $2, $3, $4, 'agent', $5, $6, $7, $8, 'not_linked')
+RETURNING *;
+
+-- name: GetTimeEntryByAgentTaskID :one
+SELECT * FROM time_entry
+WHERE agent_task_id = $1 AND workspace_id = $2;

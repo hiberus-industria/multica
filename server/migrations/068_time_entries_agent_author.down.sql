@@ -1,0 +1,10 @@
+DROP INDEX IF EXISTS idx_time_entry_agent_task_id;
+DROP INDEX IF EXISTS idx_time_entry_agent_id;
+DROP INDEX IF EXISTS idx_time_entry_agent_task_id_unique;
+ALTER TABLE time_entry DROP CONSTRAINT IF EXISTS time_entry_author_check;
+ALTER TABLE time_entry DROP CONSTRAINT IF EXISTS time_entry_duration_minutes_check;
+ALTER TABLE time_entry ADD CONSTRAINT time_entry_duration_minutes_check CHECK (duration_minutes > 0);
+ALTER TABLE time_entry DROP COLUMN IF EXISTS agent_task_id;
+ALTER TABLE time_entry DROP COLUMN IF EXISTS agent_id;
+ALTER TABLE time_entry DROP COLUMN IF EXISTS author_type;
+ALTER TABLE time_entry ALTER COLUMN user_id SET NOT NULL;

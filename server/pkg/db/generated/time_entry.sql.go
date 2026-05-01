@@ -11,13 +11,67 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createAgentTimeEntry = `-- name: CreateAgentTimeEntry :one
+INSERT INTO time_entry (
+    workspace_id, issue_id, agent_id, agent_task_id, author_type,
+    duration_minutes, activity_name, comment, spent_on, sync_status
+) VALUES ($1, $2, $3, $4, 'agent', $5, $6, $7, $8, 'not_linked')
+RETURNING id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at, author_type, agent_id, agent_task_id
+`
+
+type CreateAgentTimeEntryParams struct {
+	WorkspaceID     pgtype.UUID `json:"workspace_id"`
+	IssueID         pgtype.UUID `json:"issue_id"`
+	AgentID         pgtype.UUID `json:"agent_id"`
+	AgentTaskID     pgtype.UUID `json:"agent_task_id"`
+	DurationMinutes int32       `json:"duration_minutes"`
+	ActivityName    pgtype.Text `json:"activity_name"`
+	Comment         string      `json:"comment"`
+	SpentOn         pgtype.Date `json:"spent_on"`
+}
+
+func (q *Queries) CreateAgentTimeEntry(ctx context.Context, arg CreateAgentTimeEntryParams) (TimeEntry, error) {
+	row := q.db.QueryRow(ctx, createAgentTimeEntry,
+		arg.WorkspaceID,
+		arg.IssueID,
+		arg.AgentID,
+		arg.AgentTaskID,
+		arg.DurationMinutes,
+		arg.ActivityName,
+		arg.Comment,
+		arg.SpentOn,
+	)
+	var i TimeEntry
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.UserID,
+		&i.DurationMinutes,
+		&i.ActivityName,
+		&i.RedmineActivityID,
+		&i.Comment,
+		&i.SpentOn,
+		&i.ExternalTimeEntryID,
+		&i.SyncStatus,
+		&i.TimerStartedAt,
+		&i.TimerStoppedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AuthorType,
+		&i.AgentID,
+		&i.AgentTaskID,
+	)
+	return i, err
+}
+
 const createTimeEntry = `-- name: CreateTimeEntry :one
 INSERT INTO time_entry (
     workspace_id, issue_id, user_id, duration_minutes,
     activity_name, redmine_activity_id, comment, spent_on,
     sync_status, timer_started_at, timer_stopped_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at
+RETURNING id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at, author_type, agent_id, agent_task_id
 `
 
 type CreateTimeEntryParams struct {
@@ -65,6 +119,9 @@ func (q *Queries) CreateTimeEntry(ctx context.Context, arg CreateTimeEntryParams
 		&i.TimerStoppedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthorType,
+		&i.AgentID,
+		&i.AgentTaskID,
 	)
 	return i, err
 }
@@ -233,8 +290,12 @@ func (q *Queries) GetTimeByIssue(ctx context.Context, arg GetTimeByIssueParams) 
 }
 
 const getTimeEntry = `-- name: GetTimeEntry :one
-SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at FROM time_entry
-WHERE id = $1 AND workspace_id = $2
+SELECT te.id, te.workspace_id, te.issue_id, te.user_id, te.duration_minutes, te.activity_name, te.redmine_activity_id, te.comment, te.spent_on, te.external_time_entry_id, te.sync_status, te.timer_started_at, te.timer_stopped_at, te.created_at, te.updated_at, te.author_type, te.agent_id, te.agent_task_id,
+       a.name         AS agent_name,
+       a.avatar_url   AS agent_avatar_url
+FROM time_entry te
+LEFT JOIN agent a ON a.id = te.agent_id
+WHERE te.id = $1 AND te.workspace_id = $2
 `
 
 type GetTimeEntryParams struct {
@@ -242,8 +303,69 @@ type GetTimeEntryParams struct {
 	WorkspaceID pgtype.UUID `json:"workspace_id"`
 }
 
-func (q *Queries) GetTimeEntry(ctx context.Context, arg GetTimeEntryParams) (TimeEntry, error) {
+type GetTimeEntryRow struct {
+	ID                  pgtype.UUID        `json:"id"`
+	WorkspaceID         pgtype.UUID        `json:"workspace_id"`
+	IssueID             pgtype.UUID        `json:"issue_id"`
+	UserID              pgtype.UUID        `json:"user_id"`
+	DurationMinutes     int32              `json:"duration_minutes"`
+	ActivityName        pgtype.Text        `json:"activity_name"`
+	RedmineActivityID   pgtype.Int4        `json:"redmine_activity_id"`
+	Comment             string             `json:"comment"`
+	SpentOn             pgtype.Date        `json:"spent_on"`
+	ExternalTimeEntryID pgtype.Text        `json:"external_time_entry_id"`
+	SyncStatus          string             `json:"sync_status"`
+	TimerStartedAt      pgtype.Timestamptz `json:"timer_started_at"`
+	TimerStoppedAt      pgtype.Timestamptz `json:"timer_stopped_at"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	AuthorType          string             `json:"author_type"`
+	AgentID             pgtype.UUID        `json:"agent_id"`
+	AgentTaskID         pgtype.UUID        `json:"agent_task_id"`
+	AgentName           pgtype.Text        `json:"agent_name"`
+	AgentAvatarUrl      pgtype.Text        `json:"agent_avatar_url"`
+}
+
+func (q *Queries) GetTimeEntry(ctx context.Context, arg GetTimeEntryParams) (GetTimeEntryRow, error) {
 	row := q.db.QueryRow(ctx, getTimeEntry, arg.ID, arg.WorkspaceID)
+	var i GetTimeEntryRow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.UserID,
+		&i.DurationMinutes,
+		&i.ActivityName,
+		&i.RedmineActivityID,
+		&i.Comment,
+		&i.SpentOn,
+		&i.ExternalTimeEntryID,
+		&i.SyncStatus,
+		&i.TimerStartedAt,
+		&i.TimerStoppedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AuthorType,
+		&i.AgentID,
+		&i.AgentTaskID,
+		&i.AgentName,
+		&i.AgentAvatarUrl,
+	)
+	return i, err
+}
+
+const getTimeEntryByAgentTaskID = `-- name: GetTimeEntryByAgentTaskID :one
+SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at, author_type, agent_id, agent_task_id FROM time_entry
+WHERE agent_task_id = $1 AND workspace_id = $2
+`
+
+type GetTimeEntryByAgentTaskIDParams struct {
+	AgentTaskID pgtype.UUID `json:"agent_task_id"`
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+}
+
+func (q *Queries) GetTimeEntryByAgentTaskID(ctx context.Context, arg GetTimeEntryByAgentTaskIDParams) (TimeEntry, error) {
+	row := q.db.QueryRow(ctx, getTimeEntryByAgentTaskID, arg.AgentTaskID, arg.WorkspaceID)
 	var i TimeEntry
 	err := row.Scan(
 		&i.ID,
@@ -261,6 +383,9 @@ func (q *Queries) GetTimeEntry(ctx context.Context, arg GetTimeEntryParams) (Tim
 		&i.TimerStoppedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthorType,
+		&i.AgentID,
+		&i.AgentTaskID,
 	)
 	return i, err
 }
@@ -303,7 +428,7 @@ func (q *Queries) GetUserTimeOnDate(ctx context.Context, arg GetUserTimeOnDatePa
 }
 
 const listFailedTimeEntries = `-- name: ListFailedTimeEntries :many
-SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at FROM time_entry
+SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at, author_type, agent_id, agent_task_id FROM time_entry
 WHERE workspace_id = $1 AND sync_status = 'failed'
 ORDER BY created_at DESC
 `
@@ -333,6 +458,9 @@ func (q *Queries) ListFailedTimeEntries(ctx context.Context, workspaceID pgtype.
 			&i.TimerStoppedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AuthorType,
+			&i.AgentID,
+			&i.AgentTaskID,
 		); err != nil {
 			return nil, err
 		}
@@ -345,9 +473,13 @@ func (q *Queries) ListFailedTimeEntries(ctx context.Context, workspaceID pgtype.
 }
 
 const listTimeEntriesByIssue = `-- name: ListTimeEntriesByIssue :many
-SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at FROM time_entry
-WHERE workspace_id = $1 AND issue_id = $2
-ORDER BY spent_on DESC, created_at DESC
+SELECT te.id, te.workspace_id, te.issue_id, te.user_id, te.duration_minutes, te.activity_name, te.redmine_activity_id, te.comment, te.spent_on, te.external_time_entry_id, te.sync_status, te.timer_started_at, te.timer_stopped_at, te.created_at, te.updated_at, te.author_type, te.agent_id, te.agent_task_id,
+       a.name         AS agent_name,
+       a.avatar_url   AS agent_avatar_url
+FROM time_entry te
+LEFT JOIN agent a ON a.id = te.agent_id
+WHERE te.workspace_id = $1 AND te.issue_id = $2
+ORDER BY te.spent_on DESC, te.created_at DESC
 `
 
 type ListTimeEntriesByIssueParams struct {
@@ -355,15 +487,38 @@ type ListTimeEntriesByIssueParams struct {
 	IssueID     pgtype.UUID `json:"issue_id"`
 }
 
-func (q *Queries) ListTimeEntriesByIssue(ctx context.Context, arg ListTimeEntriesByIssueParams) ([]TimeEntry, error) {
+type ListTimeEntriesByIssueRow struct {
+	ID                  pgtype.UUID        `json:"id"`
+	WorkspaceID         pgtype.UUID        `json:"workspace_id"`
+	IssueID             pgtype.UUID        `json:"issue_id"`
+	UserID              pgtype.UUID        `json:"user_id"`
+	DurationMinutes     int32              `json:"duration_minutes"`
+	ActivityName        pgtype.Text        `json:"activity_name"`
+	RedmineActivityID   pgtype.Int4        `json:"redmine_activity_id"`
+	Comment             string             `json:"comment"`
+	SpentOn             pgtype.Date        `json:"spent_on"`
+	ExternalTimeEntryID pgtype.Text        `json:"external_time_entry_id"`
+	SyncStatus          string             `json:"sync_status"`
+	TimerStartedAt      pgtype.Timestamptz `json:"timer_started_at"`
+	TimerStoppedAt      pgtype.Timestamptz `json:"timer_stopped_at"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	AuthorType          string             `json:"author_type"`
+	AgentID             pgtype.UUID        `json:"agent_id"`
+	AgentTaskID         pgtype.UUID        `json:"agent_task_id"`
+	AgentName           pgtype.Text        `json:"agent_name"`
+	AgentAvatarUrl      pgtype.Text        `json:"agent_avatar_url"`
+}
+
+func (q *Queries) ListTimeEntriesByIssue(ctx context.Context, arg ListTimeEntriesByIssueParams) ([]ListTimeEntriesByIssueRow, error) {
 	rows, err := q.db.Query(ctx, listTimeEntriesByIssue, arg.WorkspaceID, arg.IssueID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []TimeEntry{}
+	items := []ListTimeEntriesByIssueRow{}
 	for rows.Next() {
-		var i TimeEntry
+		var i ListTimeEntriesByIssueRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
@@ -380,6 +535,11 @@ func (q *Queries) ListTimeEntriesByIssue(ctx context.Context, arg ListTimeEntrie
 			&i.TimerStoppedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AuthorType,
+			&i.AgentID,
+			&i.AgentTaskID,
+			&i.AgentName,
+			&i.AgentAvatarUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -392,7 +552,7 @@ func (q *Queries) ListTimeEntriesByIssue(ctx context.Context, arg ListTimeEntrie
 }
 
 const listTimeEntriesByUser = `-- name: ListTimeEntriesByUser :many
-SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at FROM time_entry
+SELECT id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at, author_type, agent_id, agent_task_id FROM time_entry
 WHERE workspace_id = $1 AND user_id = $2
   AND spent_on >= $3 AND spent_on <= $4
 ORDER BY spent_on DESC, created_at DESC
@@ -435,6 +595,9 @@ func (q *Queries) ListTimeEntriesByUser(ctx context.Context, arg ListTimeEntries
 			&i.TimerStoppedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AuthorType,
+			&i.AgentID,
+			&i.AgentTaskID,
 		); err != nil {
 			return nil, err
 		}
@@ -447,7 +610,7 @@ func (q *Queries) ListTimeEntriesByUser(ctx context.Context, arg ListTimeEntries
 }
 
 const listTimeEntriesByUserDateRange = `-- name: ListTimeEntriesByUserDateRange :many
-SELECT te.id, te.workspace_id, te.issue_id, te.user_id, te.duration_minutes, te.activity_name, te.redmine_activity_id, te.comment, te.spent_on, te.external_time_entry_id, te.sync_status, te.timer_started_at, te.timer_stopped_at, te.created_at, te.updated_at, i.number AS issue_number, i.title AS issue_title
+SELECT te.id, te.workspace_id, te.issue_id, te.user_id, te.duration_minutes, te.activity_name, te.redmine_activity_id, te.comment, te.spent_on, te.external_time_entry_id, te.sync_status, te.timer_started_at, te.timer_stopped_at, te.created_at, te.updated_at, te.author_type, te.agent_id, te.agent_task_id, i.number AS issue_number, i.title AS issue_title
 FROM time_entry te
 JOIN issue i ON i.id = te.issue_id
 WHERE te.workspace_id = $1 AND te.user_id = $2
@@ -478,6 +641,9 @@ type ListTimeEntriesByUserDateRangeRow struct {
 	TimerStoppedAt      pgtype.Timestamptz `json:"timer_stopped_at"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	AuthorType          string             `json:"author_type"`
+	AgentID             pgtype.UUID        `json:"agent_id"`
+	AgentTaskID         pgtype.UUID        `json:"agent_task_id"`
 	IssueNumber         int32              `json:"issue_number"`
 	IssueTitle          string             `json:"issue_title"`
 }
@@ -512,6 +678,9 @@ func (q *Queries) ListTimeEntriesByUserDateRange(ctx context.Context, arg ListTi
 			&i.TimerStoppedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AuthorType,
+			&i.AgentID,
+			&i.AgentTaskID,
 			&i.IssueNumber,
 			&i.IssueTitle,
 		); err != nil {
@@ -534,7 +703,7 @@ SET duration_minutes    = $3,
     spent_on            = $7,
     updated_at          = now()
 WHERE id = $1 AND workspace_id = $2
-RETURNING id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at
+RETURNING id, workspace_id, issue_id, user_id, duration_minutes, activity_name, redmine_activity_id, comment, spent_on, external_time_entry_id, sync_status, timer_started_at, timer_stopped_at, created_at, updated_at, author_type, agent_id, agent_task_id
 `
 
 type UpdateTimeEntryParams struct {
@@ -574,6 +743,9 @@ func (q *Queries) UpdateTimeEntry(ctx context.Context, arg UpdateTimeEntryParams
 		&i.TimerStoppedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthorType,
+		&i.AgentID,
+		&i.AgentTaskID,
 	)
 	return i, err
 }

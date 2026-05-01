@@ -231,9 +231,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 
 		r.Post("/runtimes/{runtimeId}/recover-orphans", h.RecoverOrphanedTasks)
 		r.Post("/tasks/{taskId}/session", h.PinTaskSession)
+		r.Post("/tasks/{taskId}/time-entries", h.CreateAgentTimeEntry)
 	})
-
-	// Protected API routes
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(queries, patCache))
 		r.Use(middleware.RefreshCloudFrontCookies(cfSigner))

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 
 	"strconv"
 	"strings"
@@ -649,6 +650,11 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, resu
 
 	slog.Info("task completed", "task_id", util.UUIDToString(task.ID), "issue_id", util.UUIDToString(task.IssueID))
 
+	// Auto-log time entry for issue tasks
+	if task.IssueID.Valid && task.StartedAt.Valid {
+		s.createAutoTimeEntry(ctx, task)
+	}
+
 	// Invariant: every completed issue task must have at least one agent
 	// comment on the issue, so the user always sees something when a run
 	// ends. If the agent posted a comment during execution (result, progress
@@ -791,6 +797,11 @@ func (s *TaskService) FailTask(ctx context.Context, taskID pgtype.UUID, errMsg, 
 	}
 
 	slog.Warn("task failed", "task_id", util.UUIDToString(task.ID), "issue_id", util.UUIDToString(task.IssueID), "error", errMsg, "failure_reason", failureReason)
+
+	// Auto-log time for failed tasks too (agent did work even if it failed)
+	if task.IssueID.Valid && task.StartedAt.Valid {
+		s.createAutoTimeEntry(ctx, task)
+	}
 
 	// Auto-retry eligible failures (orphan, timeout, runtime_offline,
 	// runtime_recovery). The helper itself enforces attempt < max_attempts
@@ -1660,4 +1671,49 @@ func agentToMap(a db.Agent) map[string]any {
 		"archived_at":          util.TimestampToPtr(a.ArchivedAt),
 		"archived_by":          util.UUIDToPtr(a.ArchivedBy),
 	}
+}
+
+// createAutoTimeEntry creates a time entry for a completed/failed issue task.
+// It uses idempotency to avoid duplicate entries if called more than once.
+func (s *TaskService) createAutoTimeEntry(ctx context.Context, task db.AgentTaskQueue) {
+completedAt := time.Now()
+if task.CompletedAt.Valid {
+completedAt = task.CompletedAt.Time
+}
+startedAt := task.StartedAt.Time
+durationMins := int32(math.Max(1, math.Ceil(completedAt.Sub(startedAt).Minutes())))
+
+wsID := s.ResolveTaskWorkspaceID(ctx, task)
+if wsID == "" {
+slog.Warn("auto time entry: could not resolve workspace ID", "task_id", util.UUIDToString(task.ID))
+return
+}
+
+wsUUID, err := util.ParseUUID(wsID)
+if err != nil {
+return
+}
+
+// Idempotency check
+_, err = s.Queries.GetTimeEntryByAgentTaskID(ctx, db.GetTimeEntryByAgentTaskIDParams{
+AgentTaskID: task.ID,
+WorkspaceID: wsUUID,
+})
+if err == nil {
+return // already exists
+}
+
+spentOn := pgtype.Date{Time: completedAt.UTC().Truncate(24 * time.Hour), Valid: true}
+_, err = s.Queries.CreateAgentTimeEntry(ctx, db.CreateAgentTimeEntryParams{
+WorkspaceID:     wsUUID,
+IssueID:         task.IssueID,
+AgentID:         task.AgentID,
+AgentTaskID:     pgtype.UUID{Bytes: task.ID.Bytes, Valid: true},
+DurationMinutes: durationMins,
+Comment:         "Auto-logged by Multica agent",
+SpentOn:         spentOn,
+})
+if err != nil {
+slog.Error("auto time entry: failed to create", "task_id", util.UUIDToString(task.ID), "error", err)
+}
 }

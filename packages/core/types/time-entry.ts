@@ -18,6 +18,12 @@ export interface TimeEntry {
   timer_started_at: string | null;
   timer_stopped_at: string | null;
   created_at: string;
+  // Agent author fields
+  author_type: "user" | "agent";
+  agent_id: string | null;
+  agent_name: string | null;
+  agent_avatar_url: string | null;
+  agent_task_id: string | null;
 }
 
 export interface RedmineActivity {
