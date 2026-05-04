@@ -1676,44 +1676,44 @@ func agentToMap(a db.Agent) map[string]any {
 // createAutoTimeEntry creates a time entry for a completed/failed issue task.
 // It uses idempotency to avoid duplicate entries if called more than once.
 func (s *TaskService) createAutoTimeEntry(ctx context.Context, task db.AgentTaskQueue) {
-completedAt := time.Now()
-if task.CompletedAt.Valid {
-completedAt = task.CompletedAt.Time
-}
-startedAt := task.StartedAt.Time
-durationMins := int32(math.Max(1, math.Ceil(completedAt.Sub(startedAt).Minutes())))
+	completedAt := time.Now()
+	if task.CompletedAt.Valid {
+		completedAt = task.CompletedAt.Time
+	}
+	startedAt := task.StartedAt.Time
+	durationMins := int32(math.Max(1, math.Ceil(completedAt.Sub(startedAt).Minutes())))
 
-wsID := s.ResolveTaskWorkspaceID(ctx, task)
-if wsID == "" {
-slog.Warn("auto time entry: could not resolve workspace ID", "task_id", util.UUIDToString(task.ID))
-return
-}
+	wsID := s.ResolveTaskWorkspaceID(ctx, task)
+	if wsID == "" {
+		slog.Warn("auto time entry: could not resolve workspace ID", "task_id", util.UUIDToString(task.ID))
+		return
+	}
 
-wsUUID, err := util.ParseUUID(wsID)
-if err != nil {
-return
-}
+	wsUUID, err := util.ParseUUID(wsID)
+	if err != nil {
+		return
+	}
 
-// Idempotency check
-_, err = s.Queries.GetTimeEntryByAgentTaskID(ctx, db.GetTimeEntryByAgentTaskIDParams{
-AgentTaskID: task.ID,
-WorkspaceID: wsUUID,
-})
-if err == nil {
-return // already exists
-}
+	// Idempotency check
+	_, err = s.Queries.GetTimeEntryByAgentTaskID(ctx, db.GetTimeEntryByAgentTaskIDParams{
+		AgentTaskID: task.ID,
+		WorkspaceID: wsUUID,
+	})
+	if err == nil {
+		return // already exists
+	}
 
-spentOn := pgtype.Date{Time: completedAt.UTC().Truncate(24 * time.Hour), Valid: true}
-_, err = s.Queries.CreateAgentTimeEntry(ctx, db.CreateAgentTimeEntryParams{
-WorkspaceID:     wsUUID,
-IssueID:         task.IssueID,
-AgentID:         task.AgentID,
-AgentTaskID:     pgtype.UUID{Bytes: task.ID.Bytes, Valid: true},
-DurationMinutes: durationMins,
-Comment:         "Auto-logged by Multica agent",
-SpentOn:         spentOn,
-})
-if err != nil {
-slog.Error("auto time entry: failed to create", "task_id", util.UUIDToString(task.ID), "error", err)
-}
+	spentOn := pgtype.Date{Time: completedAt.UTC().Truncate(24 * time.Hour), Valid: true}
+	_, err = s.Queries.CreateAgentTimeEntry(ctx, db.CreateAgentTimeEntryParams{
+		WorkspaceID:     wsUUID,
+		IssueID:         task.IssueID,
+		AgentID:         task.AgentID,
+		AgentTaskID:     pgtype.UUID{Bytes: task.ID.Bytes, Valid: true},
+		DurationMinutes: durationMins,
+		Comment:         "Auto-logged by Multica agent",
+		SpentOn:         spentOn,
+	})
+	if err != nil {
+		slog.Error("auto time entry: failed to create", "task_id", util.UUIDToString(task.ID), "error", err)
+	}
 }

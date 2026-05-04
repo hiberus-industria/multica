@@ -900,98 +900,98 @@ func (h *Handler) TimeTrackingDashboard(w http.ResponseWriter, r *http.Request) 
 // CreateAgentTimeEntry creates a time entry on behalf of an agent for the given task.
 // Route: POST /api/daemon/tasks/{taskId}/time-entries
 func (h *Handler) CreateAgentTimeEntry(w http.ResponseWriter, r *http.Request) {
-taskID := chi.URLParam(r, "taskId")
-task, ok := h.requireDaemonTaskAccess(w, r, taskID)
-if !ok {
-return
-}
-if !task.IssueID.Valid {
-writeError(w, http.StatusBadRequest, "task is not associated with an issue")
-return
-}
+	taskID := chi.URLParam(r, "taskId")
+	task, ok := h.requireDaemonTaskAccess(w, r, taskID)
+	if !ok {
+		return
+	}
+	if !task.IssueID.Valid {
+		writeError(w, http.StatusBadRequest, "task is not associated with an issue")
+		return
+	}
 
-var req struct {
-IssueID         string  `json:"issue_id"`
-DurationMinutes int32   `json:"duration_minutes"`
-ActivityName    *string `json:"activity_name"`
-Comment         *string `json:"comment"`
-SpentOn         *string `json:"spent_on"`
-}
-if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-writeError(w, http.StatusBadRequest, "invalid request body")
-return
-}
-if req.DurationMinutes < 1 {
-writeError(w, http.StatusBadRequest, "duration_minutes must be at least 1")
-return
-}
+	var req struct {
+		IssueID         string  `json:"issue_id"`
+		DurationMinutes int32   `json:"duration_minutes"`
+		ActivityName    *string `json:"activity_name"`
+		Comment         *string `json:"comment"`
+		SpentOn         *string `json:"spent_on"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.DurationMinutes < 1 {
+		writeError(w, http.StatusBadRequest, "duration_minutes must be at least 1")
+		return
+	}
 
-wsID := h.TaskService.ResolveTaskWorkspaceID(r.Context(), task)
-if wsID == "" {
-writeError(w, http.StatusInternalServerError, "could not resolve workspace")
-return
-}
+	wsID := h.TaskService.ResolveTaskWorkspaceID(r.Context(), task)
+	if wsID == "" {
+		writeError(w, http.StatusInternalServerError, "could not resolve workspace")
+		return
+	}
 
-// Idempotency: if a time entry already exists for this task, return it
-existing, err := h.Queries.GetTimeEntryByAgentTaskID(r.Context(), db.GetTimeEntryByAgentTaskIDParams{
-AgentTaskID: task.ID,
-WorkspaceID: parseUUID(wsID),
-})
-if err == nil {
-writeJSON(w, http.StatusOK, timeEntryToResponse(existing))
-return
-}
+	// Idempotency: if a time entry already exists for this task, return it
+	existing, err := h.Queries.GetTimeEntryByAgentTaskID(r.Context(), db.GetTimeEntryByAgentTaskIDParams{
+		AgentTaskID: task.ID,
+		WorkspaceID: parseUUID(wsID),
+	})
+	if err == nil {
+		writeJSON(w, http.StatusOK, timeEntryToResponse(existing))
+		return
+	}
 
-// Use the task's issue if no explicit issue_id override
-issueID := task.IssueID
-if req.IssueID != "" {
-issueID = parseUUID(req.IssueID)
-}
+	// Use the task's issue if no explicit issue_id override
+	issueID := task.IssueID
+	if req.IssueID != "" {
+		issueID = parseUUID(req.IssueID)
+	}
 
-var spentOn pgtype.Date
-if req.SpentOn != nil && *req.SpentOn != "" {
-t, err := time.Parse("2006-01-02", *req.SpentOn)
-if err != nil {
-writeError(w, http.StatusBadRequest, "invalid spent_on date format, use YYYY-MM-DD")
-return
-}
-spentOn = pgtype.Date{Time: t, Valid: true}
-} else {
-spentOn = pgtype.Date{Time: time.Now(), Valid: true}
-}
+	var spentOn pgtype.Date
+	if req.SpentOn != nil && *req.SpentOn != "" {
+		t, err := time.Parse("2006-01-02", *req.SpentOn)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid spent_on date format, use YYYY-MM-DD")
+			return
+		}
+		spentOn = pgtype.Date{Time: t, Valid: true}
+	} else {
+		spentOn = pgtype.Date{Time: time.Now(), Valid: true}
+	}
 
-comment := "Auto-logged by Multica agent"
-if req.Comment != nil && *req.Comment != "" {
-comment = *req.Comment
-}
+	comment := "Auto-logged by Multica agent"
+	if req.Comment != nil && *req.Comment != "" {
+		comment = *req.Comment
+	}
 
-var activityName pgtype.Text
-if req.ActivityName != nil {
-activityName = strToText(*req.ActivityName)
-}
+	var activityName pgtype.Text
+	if req.ActivityName != nil {
+		activityName = strToText(*req.ActivityName)
+	}
 
-entry, err := h.Queries.CreateAgentTimeEntry(r.Context(), db.CreateAgentTimeEntryParams{
-WorkspaceID:     parseUUID(wsID),
-IssueID:         issueID,
-AgentID:         task.AgentID,
-AgentTaskID:     pgtype.UUID{Bytes: task.ID.Bytes, Valid: true},
-DurationMinutes: req.DurationMinutes,
-ActivityName:    activityName,
-Comment:         comment,
-SpentOn:         spentOn,
-})
-if err != nil {
-slog.Error("failed to create agent time entry", "error", err)
-writeError(w, http.StatusInternalServerError, "failed to create time entry")
-return
-}
+	entry, err := h.Queries.CreateAgentTimeEntry(r.Context(), db.CreateAgentTimeEntryParams{
+		WorkspaceID:     parseUUID(wsID),
+		IssueID:         issueID,
+		AgentID:         task.AgentID,
+		AgentTaskID:     pgtype.UUID{Bytes: task.ID.Bytes, Valid: true},
+		DurationMinutes: req.DurationMinutes,
+		ActivityName:    activityName,
+		Comment:         comment,
+		SpentOn:         spentOn,
+	})
+	if err != nil {
+		slog.Error("failed to create agent time entry", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to create time entry")
+		return
+	}
 
-resp := timeEntryToResponse(entry)
+	resp := timeEntryToResponse(entry)
 
-h.publish(protocol.EventTimeEntryCreated, wsID, "agent", uuidToString(task.AgentID), map[string]any{
-"issue_id":   uuidToString(issueID),
-"time_entry": resp,
-})
+	h.publish(protocol.EventTimeEntryCreated, wsID, "agent", uuidToString(task.AgentID), map[string]any{
+		"issue_id":   uuidToString(issueID),
+		"time_entry": resp,
+	})
 
-writeJSON(w, http.StatusCreated, resp)
+	writeJSON(w, http.StatusCreated, resp)
 }
