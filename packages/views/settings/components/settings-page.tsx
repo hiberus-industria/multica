@@ -3,16 +3,16 @@
 import React from "react";
 import {
   User,
-  Palette,
+  SlidersHorizontal,
   Key,
-  KeyRound,
-  Plug,
   Settings,
   Users,
   FolderGit2,
   FlaskConical,
   Bell,
+  KeyRound,
   CalendarDays,
+  Plug,
 } from "lucide-react";
 import {
   Tabs,
@@ -21,8 +21,9 @@ import {
   TabsContent,
 } from "@multica/ui/components/ui/tabs";
 import { useCurrentWorkspace } from "@multica/core/paths";
+import { useNavigation } from "../../navigation";
 import { AccountTab } from "./account-tab";
-import { AppearanceTab } from "./appearance-tab";
+import { PreferencesTab } from "./preferences-tab";
 import { TokensTab } from "./tokens-tab";
 import { WorkspaceTab } from "./workspace-tab";
 import { MembersTab } from "./members-tab";
@@ -36,14 +37,14 @@ import { WorkCalendarsTab } from "./work-calendars-tab";
 
 const ACCOUNT_TAB_KEYS = [
   "profile",
-  "appearance",
+  "preferences",
   "notifications",
   "tokens",
   "user_integrations",
 ] as const;
 const ACCOUNT_TAB_ICONS = {
   profile: User,
-  appearance: Palette,
+  preferences: SlidersHorizontal,
   notifications: Bell,
   tokens: Key,
   user_integrations: KeyRound,
@@ -74,6 +75,9 @@ const WORKSPACE_TAB_ICONS = {
   integrations: Plug,
 } as const;
 
+const DEFAULT_TAB = "profile";
+const TAB_QUERY_KEY = "tab";
+
 export interface ExtraSettingsTab {
   value: string;
   label: string;
@@ -89,10 +93,37 @@ interface SettingsPageProps {
 export function SettingsPage({ extraAccountTabs }: SettingsPageProps = {}) {
   const { t } = useT("settings");
   const workspaceName = useCurrentWorkspace()?.name;
+  const navigation = useNavigation();
+
+  // Whitelist of valid tab values; unknown ?tab=… values silently fall back to
+  // the default. Whitelisting also blocks junk like ?tab=<script> from
+  // surfacing in the DOM via Radix Tabs internals.
+  const validTabs = React.useMemo(
+    () =>
+      new Set<string>([
+        ...ACCOUNT_TAB_KEYS,
+        ...Object.values(WORKSPACE_TAB_VALUES),
+        ...(extraAccountTabs?.map((tab) => tab.value) ?? []),
+      ]),
+    [extraAccountTabs],
+  );
+
+  const tabFromUrl = navigation.searchParams.get(TAB_QUERY_KEY);
+  const activeTab =
+    tabFromUrl && validTabs.has(tabFromUrl) ? tabFromUrl : DEFAULT_TAB;
+
+  // replace (not push) so settings tab switches don't pollute browser history.
+  // Preserve any other query params the page may carry.
+  const handleTabChange = (next: string) => {
+    const params = new URLSearchParams(navigation.searchParams);
+    params.set(TAB_QUERY_KEY, next);
+    navigation.replace(`${navigation.pathname}?${params.toString()}`);
+  };
 
   return (
     <Tabs
-      defaultValue="profile"
+      value={activeTab}
+      onValueChange={handleTabChange}
       orientation="vertical"
       className="flex-1 min-h-0 gap-0 flex flex-col md:flex-row md:overflow-hidden overflow-y-auto"
     >
@@ -144,8 +175,8 @@ export function SettingsPage({ extraAccountTabs }: SettingsPageProps = {}) {
           <TabsContent value="profile">
             <AccountTab />
           </TabsContent>
-          <TabsContent value="appearance">
-            <AppearanceTab />
+          <TabsContent value="preferences">
+            <PreferencesTab />
           </TabsContent>
           <TabsContent value="notifications">
             <NotificationsTab />

@@ -4,11 +4,14 @@ export type NotificationGroupKey =
   | "comments"
   | "updates"
   | "agent_activity"
+  | "system_notifications"
   | "time_tracking";
 
 export type NotificationGroupValue = "all" | "muted";
 
-export type NotificationPreferences = Partial<Record<NotificationGroupKey, NotificationGroupValue>>;
+export type NotificationPreferences = Partial<
+  Record<NotificationGroupKey, NotificationGroupValue>
+>;
 
 export interface NotificationPreferenceResponse {
   workspace_id: string;

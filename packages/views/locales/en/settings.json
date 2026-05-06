@@ -1,5 +1,5 @@
 {
-  "appearance": {
+  "preferences": {
     "theme": {
       "title": "Theme",
       "light": "Light",
@@ -19,7 +19,7 @@
     "workspace_fallback": "Workspace",
     "tabs": {
       "profile": "Profile",
-      "appearance": "Appearance",
+      "preferences": "Preferences",
       "notifications": "Notifications",
       "tokens": "API Tokens",
       "general": "General",
@@ -71,6 +71,12 @@
         "label": "Time tracking reminders",
         "description": "Daily reminder when you haven't logged the required hours based on the work calendar"
       }
+    },
+    "system": {
+      "title": "System Notifications",
+      "description": "Control native OS notification banners shown when Multica is in the background.",
+      "label": "Show system notifications",
+      "hint": "Show a banner from your operating system for new inbox items when the app isn't focused."
     }
   },
   "tokens": {
