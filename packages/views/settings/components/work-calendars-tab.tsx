@@ -58,13 +58,9 @@ import type {
     CalendarDayType,
     MonthlyHours,
 } from "@multica/core/types";
+import { useT } from "../../i18n";
 
 // ---- Constants ----
-
-const MONTH_NAMES = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-];
 
 const SHORT_MONTH_NAMES = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -221,10 +217,23 @@ function EditableMonthGrid({
         cells.push(dayMap.get(dateStr) ?? null);
     }
 
+    const { t } = useT("work-calendars");
+    const monthNames = [
+        t($ => $.month_1), t($ => $.month_2), t($ => $.month_3), t($ => $.month_4),
+        t($ => $.month_5), t($ => $.month_6), t($ => $.month_7), t($ => $.month_8),
+        t($ => $.month_9), t($ => $.month_10), t($ => $.month_11), t($ => $.month_12),
+    ];
+    const dayTypeLabels = {
+        normal: t($ => $.day_type_normal),
+        reduced: t($ => $.day_type_reduced),
+        holiday: t($ => $.day_type_holiday),
+        weekend: t($ => $.day_type_weekend),
+    };
+
     return (
         <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold">{MONTH_NAMES[month - 1]}</span>
+                <span className="text-xs font-semibold">{monthNames[month - 1]}</span>
                 {monthlyHours && (
                     <span className="text-[10px] tabular-nums text-muted-foreground font-medium">
                         {monthlyHours.total_hours}h
@@ -253,7 +262,7 @@ function EditableMonthGrid({
                   ${cfg.bg} ${cfg.text}
                   ${isSelected ? `ring-2 ${cfg.ring} scale-110 z-10 shadow-sm` : "hover:ring-1 hover:ring-foreground/15"}
                 `}
-                                title={`${day.date} — ${cfg.label}${day.hours > 0 ? ` (${formatHours(day.hours)})` : ""}${day.label ? ` — ${day.label}` : ""}`}
+                                title={`${day.date} — ${dayTypeLabels[day.type]}${day.hours > 0 ? ` (${formatHours(day.hours)})` : ""}${day.label ? ` — ${day.label}` : ""}`}
                             >
                                 {new Date(day.date).getDate()}
                             </PopoverTrigger>
@@ -278,10 +287,17 @@ function DayEditorPopoverContent({
     day: CalendarDay;
     onUpdate: (updated: CalendarDay) => void;
 }) {
+    const { t } = useT("work-calendars");
     const cfg = DAY_TYPE_CONFIG[day.type];
     const dateObj = new Date(day.date + "T00:00:00");
     const dayName = dateObj.toLocaleDateString("en-US", { weekday: "short" });
     const monthDay = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const dayTypeLabels = {
+        normal: t($ => $.day_type_normal),
+        reduced: t($ => $.day_type_reduced),
+        holiday: t($ => $.day_type_holiday),
+        weekend: t($ => $.day_type_weekend),
+    };
 
     return (
         <div className="space-y-2">
@@ -289,7 +305,7 @@ function DayEditorPopoverContent({
                 <span className="text-xs font-medium">{dayName}, {monthDay}</span>
                 <Badge variant="secondary" className={`text-[9px] py-0 px-1.5 ${cfg.text}`}>
                     <div className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                    {cfg.label}
+                    {dayTypeLabels[day.type]}
                 </Badge>
             </div>
 
@@ -315,7 +331,7 @@ function DayEditorPopoverContent({
                                 }
               `}
                         >
-                            {tc.label}
+                            {dayTypeLabels[type]}
                         </button>
                     );
                 })}
@@ -336,7 +352,7 @@ function DayEditorPopoverContent({
                 </div>
                 <Input
                     type="text"
-                    placeholder="Note…"
+                    placeholder={t($ => $.day_note_placeholder)}
                     value={day.label ?? ""}
                     onChange={(e) => onUpdate({ ...day, label: e.target.value || undefined })}
                     className="h-6 text-[11px] flex-1 px-1.5"
@@ -348,6 +364,7 @@ function DayEditorPopoverContent({
 
 /** Stats bar */
 function CalendarStats({ days, monthlyHours }: { days: CalendarDay[]; monthlyHours: MonthlyHours[] }) {
+    const { t } = useT("work-calendars");
     const totalWorkHours = monthlyHours.reduce((s, m) => s + m.total_hours, 0);
     const holidays = days.filter((d) => d.type === "holiday").length;
     const reducedDays = days.filter((d) => d.type === "reduced").length;
@@ -356,10 +373,10 @@ function CalendarStats({ days, monthlyHours }: { days: CalendarDay[]; monthlyHou
     return (
         <div className="grid grid-cols-4 gap-2">
             {[
-                { icon: <Clock className="h-3.5 w-3.5 text-muted-foreground" />, value: `${Math.round(totalWorkHours)}h`, label: "Total year", bg: "bg-muted/40" },
-                { icon: <div className="h-2 w-2 rounded-full bg-emerald-500" />, value: String(normalDays), label: "Work days", bg: "bg-emerald-500/10" },
-                { icon: <div className="h-2 w-2 rounded-full bg-amber-500" />, value: String(reducedDays), label: "Reduced", bg: "bg-amber-500/10" },
-                { icon: <div className="h-2 w-2 rounded-full bg-rose-500" />, value: String(holidays), label: "Holidays", bg: "bg-rose-500/10" },
+                { icon: <Clock className="h-3.5 w-3.5 text-muted-foreground" />, value: `${Math.round(totalWorkHours)}h`, label: t($ => $.stats_total_year), bg: "bg-muted/40" },
+                { icon: <div className="h-2 w-2 rounded-full bg-emerald-500" />, value: String(normalDays), label: t($ => $.stats_work_days), bg: "bg-emerald-500/10" },
+                { icon: <div className="h-2 w-2 rounded-full bg-amber-500" />, value: String(reducedDays), label: t($ => $.stats_reduced), bg: "bg-amber-500/10" },
+                { icon: <div className="h-2 w-2 rounded-full bg-rose-500" />, value: String(holidays), label: t($ => $.stats_holidays), bg: "bg-rose-500/10" },
             ].map((s) => (
                 <div key={s.label} className={`flex items-center gap-2 p-2 rounded-md ${s.bg}`}>
                     <div className="shrink-0">{s.icon}</div>
@@ -375,13 +392,19 @@ function CalendarStats({ days, monthlyHours }: { days: CalendarDay[]; monthlyHou
 
 /** Monthly hours bar chart */
 function MonthlyHoursChart({ monthlyHours }: { monthlyHours: MonthlyHours[] }) {
+    const { t } = useT("work-calendars");
+    const monthNames = [
+        t($ => $.month_1), t($ => $.month_2), t($ => $.month_3), t($ => $.month_4),
+        t($ => $.month_5), t($ => $.month_6), t($ => $.month_7), t($ => $.month_8),
+        t($ => $.month_9), t($ => $.month_10), t($ => $.month_11), t($ => $.month_12),
+    ];
     const maxHours = Math.max(...monthlyHours.map((m) => m.total_hours), 1);
     return (
         <div className="flex items-end gap-1 h-20">
             {monthlyHours.map((m) => {
                 const height = (m.total_hours / maxHours) * 100;
                 return (
-                    <div key={m.month} className="flex-1 flex flex-col items-center gap-1" title={`${MONTH_NAMES[m.month - 1]}: ${m.total_hours}h`}>
+                    <div key={m.month} className="flex-1 flex flex-col items-center gap-1" title={`${monthNames[m.month - 1]}: ${m.total_hours}h`}>
                         <div className="w-full flex items-end justify-center" style={{ height: "64px" }}>
                             <div
                                 className="w-full rounded-t-sm bg-primary/20 hover:bg-primary/30 transition-colors relative group/bar"
@@ -409,6 +432,7 @@ function CalendarDetailView({
     calendar: WorkCalendar;
     onClose: () => void;
 }) {
+    const { t } = useT("work-calendars");
     // Local editable state — starts from the calendar data
     const [editedDays, setEditedDays] = useState<Map<string, CalendarDay>>(() => buildDayMap(calendar.days));
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -450,9 +474,9 @@ function CalendarDetailView({
                 },
             });
             setIsDirty(false);
-            toast.success("Calendar saved");
+            toast.success(t($ => $.toast_saved));
         } catch {
-            toast.error("Failed to save calendar");
+            toast.error(t($ => $.toast_save_failed));
         }
     };
 
@@ -467,7 +491,7 @@ function CalendarDetailView({
                     <div>
                         <h2 className="text-sm font-semibold">{calendar.name}</h2>
                         <p className="text-xs text-muted-foreground">
-                            {calendar.year} · {calendar.source === "pdf_import" ? "Imported from PDF" : "Manual"} · Click any day to edit
+                            {calendar.year} · {calendar.source === "pdf_import" ? t($ => $.detail_subtitle_pdf) : t($ => $.detail_subtitle_manual)} · {t($ => $.detail_subtitle_hint)}
                         </p>
                     </div>
                 </div>
@@ -475,7 +499,7 @@ function CalendarDetailView({
                     {isDirty && (
                         <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
                             <Save className="h-3.5 w-3.5" />
-                            {updateMutation.isPending ? "Saving…" : "Save Changes"}
+                            {updateMutation.isPending ? t($ => $.detail_saving) : t($ => $.detail_save)}
                         </Button>
                     )}
                     <Badge variant="outline" className="text-xs">
@@ -490,19 +514,27 @@ function CalendarDetailView({
 
             {/* Legend */}
             <div className="flex items-center gap-4 flex-wrap">
-                {ALL_DAY_TYPES.map((type) => (
-                    <div key={type} className="flex items-center gap-1.5">
-                        <div className={`h-2 w-2 rounded-full ${DAY_TYPE_CONFIG[type].dot}`} />
-                        <span className="text-[10px] text-muted-foreground">{DAY_TYPE_CONFIG[type].label}</span>
-                    </div>
-                ))}
+                {ALL_DAY_TYPES.map((type) => {
+                    const dayTypeLabels = {
+                        normal: t($ => $.day_type_normal),
+                        reduced: t($ => $.day_type_reduced),
+                        holiday: t($ => $.day_type_holiday),
+                        weekend: t($ => $.day_type_weekend),
+                    };
+                    return (
+                        <div key={type} className="flex items-center gap-1.5">
+                            <div className={`h-2 w-2 rounded-full ${DAY_TYPE_CONFIG[type].dot}`} />
+                            <span className="text-[10px] text-muted-foreground">{dayTypeLabels[type]}</span>
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Monthly hours chart */}
             {currentMonthlyHours.length > 0 && (
                 <Card>
                     <CardContent className="pt-4">
-                        <p className="text-xs font-semibold mb-3">Monthly Hours Distribution</p>
+                        <p className="text-xs font-semibold mb-3">{t($ => $.section_monthly_hours)}</p>
                         <MonthlyHoursChart monthlyHours={currentMonthlyHours} />
                     </CardContent>
                 </Card>
@@ -511,7 +543,7 @@ function CalendarDetailView({
             {/* Full year calendar grid — interactive */}
             <Card>
                 <CardContent className="pt-4">
-                    <p className="text-xs font-semibold mb-4">Full Year Calendar</p>
+                    <p className="text-xs font-semibold mb-4">{t($ => $.section_full_year)}</p>
                     <div className="grid grid-cols-3 gap-x-5 gap-y-4 sm:grid-cols-4">
                         {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
                             <EditableMonthGrid
@@ -543,6 +575,7 @@ function CalendarCard({
     onSelect: () => void;
     onDelete: () => void;
 }) {
+    const { t } = useT("work-calendars");
     const dayMap = buildDayMap(calendar.days);
     const totalHours = calendar.monthly_hours.reduce((s, m) => s + m.total_hours, 0);
     const holidays = calendar.days.filter((d) => d.type === "holiday").length;
@@ -567,7 +600,7 @@ function CalendarCard({
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            {calendar.year} · {Math.round(totalHours)}h total · {holidays} holidays
+                            {t($ => $.card_meta, { year: calendar.year, hours: Math.round(totalHours), holidays })}
                         </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -593,12 +626,13 @@ function CalendarCard({
 // ---- Dialogs ----
 
 function CreateCalendarDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+    const { t } = useT("work-calendars");
     const [name, setName] = useState("");
     const [year, setYear] = useState(new Date().getFullYear());
     const createMutation = useCreateWorkCalendar();
 
     const handleCreate = async () => {
-        if (!name.trim()) { toast.error("Name is required"); return; }
+        if (!name.trim()) { toast.error(t($ => $.toast_name_required)); return; }
 
         // Generate a full year of default days (weekends + 8h workdays)
         const days: CalendarDay[] = [];
@@ -619,11 +653,11 @@ function CreateCalendarDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
         try {
             await createMutation.mutateAsync({ name: name.trim(), year, days, monthly_hours });
-            toast.success("Calendar created — click days to customize");
+            toast.success(t($ => $.toast_created));
             setName("");
             onOpenChange(false);
         } catch {
-            toast.error("Failed to create calendar");
+            toast.error(t($ => $.toast_create_failed));
         }
     };
 
@@ -631,25 +665,25 @@ function CreateCalendarDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Create Work Calendar</DialogTitle>
+                    <DialogTitle>{t($ => $.create_dialog_title)}</DialogTitle>
                     <DialogDescription>
-                        A full-year calendar will be generated with 8h workdays. You can then customize each day.
+                        {t($ => $.create_dialog_description)}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
                     <div className="space-y-1.5">
-                        <label className="text-xs text-muted-foreground font-medium">Name</label>
-                        <Input placeholder="e.g. Spain 2026" value={name} onChange={(e) => setName(e.target.value)} className="text-sm" autoFocus />
+                        <label className="text-xs text-muted-foreground font-medium">{t($ => $.form_label_name)}</label>
+                        <Input placeholder={t($ => $.form_placeholder_name)} value={name} onChange={(e) => setName(e.target.value)} className="text-sm" autoFocus />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs text-muted-foreground font-medium">Year</label>
+                        <label className="text-xs text-muted-foreground font-medium">{t($ => $.form_label_year)}</label>
                         <Input type="number" min={2000} max={2100} value={year} onChange={(e) => setYear(parseInt(e.target.value) || new Date().getFullYear())} className="text-sm" />
                     </div>
                 </div>
                 <DialogFooter>
-                    <DialogClose render={<Button variant="outline" size="sm">Cancel</Button>} />
+                    <DialogClose render={<Button variant="outline" size="sm">{t($ => $.btn_cancel)}</Button>} />
                     <Button size="sm" onClick={handleCreate} disabled={createMutation.isPending}>
-                        {createMutation.isPending ? "Creating…" : "Create"}
+                        {createMutation.isPending ? t($ => $.btn_creating) : t($ => $.btn_create)}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -658,22 +692,23 @@ function CreateCalendarDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 }
 
 function ImportPDFDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+    const { t } = useT("work-calendars");
     const [name, setName] = useState("");
     const [file, setFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const importMutation = useImportWorkCalendarFromPDF();
 
     const handleImport = async () => {
-        if (!file) { toast.error("Select a PDF file"); return; }
-        if (!name.trim()) { toast.error("Name is required"); return; }
+        if (!file) { toast.error(t($ => $.toast_select_pdf)); return; }
+        if (!name.trim()) { toast.error(t($ => $.toast_name_required)); return; }
         try {
             await importMutation.mutateAsync({ file, name: name.trim() });
-            toast.success("Calendar imported — review and edit days as needed");
+            toast.success(t($ => $.toast_imported));
             setFile(null);
             setName("");
             onOpenChange(false);
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Failed to import PDF");
+            toast.error(err instanceof Error ? err.message : t($ => $.toast_import_failed));
         }
     };
 
@@ -689,19 +724,18 @@ function ImportPDFDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Import Calendar from PDF</DialogTitle>
+                    <DialogTitle>{t($ => $.import_dialog_title)}</DialogTitle>
                     <DialogDescription>
-                        Upload a work schedule PDF. Holidays, reduced days, and monthly hours will be extracted automatically.
-                        You can fine-tune any day after import.
+                        {t($ => $.import_dialog_description)}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
                     <div className="space-y-1.5">
-                        <label className="text-xs text-muted-foreground font-medium">Name</label>
-                        <Input placeholder="e.g. Hiberus 2026" value={name} onChange={(e) => setName(e.target.value)} className="text-sm" />
+                        <label className="text-xs text-muted-foreground font-medium">{t($ => $.form_label_name)}</label>
+                        <Input placeholder={t($ => $.form_placeholder_import_name)} value={name} onChange={(e) => setName(e.target.value)} className="text-sm" />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs text-muted-foreground font-medium">PDF File</label>
+                        <label className="text-xs text-muted-foreground font-medium">{t($ => $.form_label_pdf_file)}</label>
                         <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" onChange={handleFileChange} className="hidden" />
                         <div
                             onClick={() => fileInputRef.current?.click()}
@@ -712,24 +746,24 @@ function ImportPDFDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
                                     <FileText className="h-5 w-5 text-primary" />
                                     <div className="text-left">
                                         <p className="text-sm font-medium truncate max-w-[250px]">{file.name}</p>
-                                        <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB · Click to change</p>
+                                        <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} {t($ => $.file_click_to_change)}</p>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
                                     <Upload className="h-8 w-8 text-muted-foreground/50 mx-auto" />
-                                    <p className="text-sm text-muted-foreground">Click to select PDF</p>
-                                    <p className="text-xs text-muted-foreground/60">Max 10 MB</p>
+                                    <p className="text-sm text-muted-foreground">{t($ => $.file_click_to_select)}</p>
+                                    <p className="text-xs text-muted-foreground/60">{t($ => $.file_max_size)}</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
                 <DialogFooter>
-                    <DialogClose render={<Button variant="outline" size="sm">Cancel</Button>} />
+                    <DialogClose render={<Button variant="outline" size="sm">{t($ => $.btn_cancel)}</Button>} />
                     <Button size="sm" onClick={handleImport} disabled={importMutation.isPending || !file}>
                         <Upload className="h-3.5 w-3.5" />
-                        {importMutation.isPending ? "Importing…" : "Import"}
+                        {importMutation.isPending ? t($ => $.btn_importing) : t($ => $.btn_import)}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -741,6 +775,7 @@ function ImportPDFDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
 
 export function WorkCalendarsTab() {
     const wsId = useWorkspaceId();
+    const { t } = useT("work-calendars");
     const { data, isLoading } = useQuery(workCalendarListOptions(wsId));
     const deleteMutation = useDeleteWorkCalendar();
     const [selectedCalendar, setSelectedCalendar] = useState<WorkCalendar | null>(null);
@@ -754,10 +789,10 @@ export function WorkCalendarsTab() {
         if (!deleteTarget) return;
         try {
             await deleteMutation.mutateAsync(deleteTarget.id);
-            toast.success("Calendar deleted");
+            toast.success(t($ => $.toast_deleted));
             if (selectedCalendar?.id === deleteTarget.id) setSelectedCalendar(null);
         } catch {
-            toast.error("Failed to delete calendar");
+            toast.error(t($ => $.toast_delete_failed));
         }
         setDeleteTarget(null);
     };
@@ -773,19 +808,19 @@ export function WorkCalendarsTab() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                    <h2 className="text-sm font-semibold">Work Calendars</h2>
+                    <h2 className="text-sm font-semibold">{t($ => $.tab_title)}</h2>
                     <p className="text-xs text-muted-foreground">
-                        Configure work schedules with holidays, reduced days, and expected hours per month.
+                        {t($ => $.tab_description)}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
                         <Upload className="h-3.5 w-3.5" />
-                        Import PDF
+                        {t($ => $.btn_import_pdf)}
                     </Button>
                     <Button size="sm" onClick={() => setShowCreateDialog(true)}>
                         <Plus className="h-3.5 w-3.5" />
-                        New Calendar
+                        {t($ => $.btn_new_calendar)}
                     </Button>
                 </div>
             </div>
@@ -801,18 +836,18 @@ export function WorkCalendarsTab() {
                         <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                             <CalendarDays className="h-6 w-6 text-primary" />
                         </div>
-                        <h3 className="text-sm font-semibold mb-1">No calendars yet</h3>
+                        <h3 className="text-sm font-semibold mb-1">{t($ => $.empty_title)}</h3>
                         <p className="text-xs text-muted-foreground mb-4 max-w-[300px] mx-auto">
-                            Create a work calendar to define your team&apos;s schedule, holidays, and expected work hours.
+                            {t($ => $.empty_description)}
                         </p>
                         <div className="flex items-center justify-center gap-2">
                             <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
                                 <Upload className="h-3.5 w-3.5" />
-                                Import from PDF
+                                {t($ => $.empty_btn_import)}
                             </Button>
                             <Button size="sm" onClick={() => setShowCreateDialog(true)}>
                                 <Plus className="h-3.5 w-3.5" />
-                                Create Calendar
+                                {t($ => $.empty_btn_create)}
                             </Button>
                         </div>
                     </CardContent>
@@ -831,15 +866,15 @@ export function WorkCalendarsTab() {
             <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete calendar</AlertDialogTitle>
+                        <AlertDialogTitle>{t($ => $.delete_dialog_title)}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete &ldquo;{deleteTarget?.name}&rdquo;? This action cannot be undone.
+                            {t($ => $.delete_dialog_description, { name: deleteTarget?.name ?? "" })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t($ => $.delete_btn_cancel)}</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            {deleteMutation.isPending ? "Deleting…" : "Delete"}
+                            {deleteMutation.isPending ? t($ => $.delete_btn_confirming) : t($ => $.delete_btn_confirm)}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

@@ -20,6 +20,8 @@ import enChat from "./en/chat.json";
 import enModals from "./en/modals.json";
 import enRuntimes from "./en/runtimes.json";
 import enLayout from "./en/layout.json";
+import enTimeTracking from "./en/time-tracking.json";
+import enWorkCalendars from "./en/work-calendars.json";
 import zhHansCommon from "./zh-Hans/common.json";
 import zhHansAuth from "./zh-Hans/auth.json";
 import zhHansSettings from "./zh-Hans/settings.json";
@@ -41,6 +43,8 @@ import zhHansChat from "./zh-Hans/chat.json";
 import zhHansModals from "./zh-Hans/modals.json";
 import zhHansRuntimes from "./zh-Hans/runtimes.json";
 import zhHansLayout from "./zh-Hans/layout.json";
+import zhHansTimeTracking from "./zh-Hans/time-tracking.json";
+import zhHansWorkCalendars from "./zh-Hans/work-calendars.json";
 
 // Single source of truth for the resource bundle. Both apps (web layout +
 // desktop App.tsx) import from here so adding a locale or namespace happens
@@ -68,6 +72,8 @@ export const RESOURCES: Record<SupportedLocale, LocaleResources> = {
     modals: enModals,
     runtimes: enRuntimes,
     layout: enLayout,
+    "time-tracking": enTimeTracking,
+    "work-calendars": enWorkCalendars,
   },
   "zh-Hans": {
     common: zhHansCommon,
@@ -91,5 +97,7 @@ export const RESOURCES: Record<SupportedLocale, LocaleResources> = {
     modals: zhHansModals,
     runtimes: zhHansRuntimes,
     layout: zhHansLayout,
+    "time-tracking": zhHansTimeTracking,
+    "work-calendars": zhHansWorkCalendars,
   },
 };

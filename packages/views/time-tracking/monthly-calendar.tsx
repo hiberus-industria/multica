@@ -19,6 +19,7 @@ import {
 } from "@multica/ui/components/ui/tooltip";
 import { cn } from "@multica/ui/lib/utils";
 import type { CalendarDay, WorkCalendar } from "@multica/core/types";
+import { useT } from "../i18n";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -90,8 +91,6 @@ function computeDayStatus(
     if (loggedMinutes > 0) return "partial";
     return "missing";
 }
-
-const WEEKDAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // ─── Day Cell ────────────────────────────────────────────────────────────────
 
@@ -176,14 +175,15 @@ function DayCell({ day }: { day: DayInfo }) {
 }
 
 function DayTooltip({ day }: { day: DayInfo }) {
+    const { t } = useT("time-tracking");
     const statusLabel = {
-        complete: "On target",
-        over: "Overtime",
-        partial: "Partial",
-        missing: "Not logged",
-        holiday: "Holiday",
-        weekend: "Weekend",
-        future: "Upcoming",
+        complete: t($ => $.day_status_complete),
+        over: t($ => $.day_status_over),
+        partial: t($ => $.day_status_partial),
+        missing: t($ => $.day_status_missing),
+        holiday: t($ => $.day_status_holiday),
+        weekend: t($ => $.day_status_weekend),
+        future: t($ => $.day_status_future),
     }[day.status];
 
     return (
@@ -195,11 +195,11 @@ function DayTooltip({ day }: { day: DayInfo }) {
             {day.status !== "future" && day.status !== "weekend" && day.status !== "holiday" && (
                 <div className="space-y-0.5 text-[10px] text-muted-foreground">
                     <p>
-                        Logged: <span className="font-medium text-foreground">{formatMinutes(day.loggedMinutes)}</span>
+                        {t($ => $.tooltip_logged)} <span className="font-medium text-foreground">{formatMinutes(day.loggedMinutes)}</span>
                         {day.requiredHours > 0 && <> / {formatHours(day.requiredHours)}</>}
                     </p>
                     {day.entriesCount > 0 && (
-                        <p>{day.entriesCount} {day.entriesCount === 1 ? "entry" : "entries"}</p>
+                        <p>{t($ => $.tooltip_entry_other, { count: day.entriesCount })}</p>
                     )}
                 </div>
             )}
@@ -241,10 +241,11 @@ function KpiCard({
 // ─── Legend ──────────────────────────────────────────────────────────────────
 
 function CalendarLegend() {
+    const { t } = useT("time-tracking");
     const items: { color: string; label: string }[] = [
-        { color: "bg-emerald-500", label: "On target" },
-        { color: "bg-amber-500", label: "Partial" },
-        { color: "bg-red-400", label: "Missing" },
+        { color: "bg-emerald-500", label: t($ => $.legend_on_target) },
+        { color: "bg-amber-500", label: t($ => $.legend_partial) },
+        { color: "bg-red-400", label: t($ => $.legend_missing) },
     ];
 
     return (
@@ -278,6 +279,7 @@ function CalendarSkeleton() {
 
 export function MonthlyCalendarView({ year, month }: { year: number; month: number }) {
     const wsId = useWorkspaceId();
+    const { t } = useT("time-tracking");
 
     const range = useMemo(() => getMonthRange(year, month), [year, month]);
 
@@ -424,25 +426,25 @@ export function MonthlyCalendarView({ year, month }: { year: number; month: numb
             {/* KPI row */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <KpiCard
-                    label="Logged this month"
+                    label={t($ => $.monthly_logged_this_month)}
                     value={formatMinutes(kpis.totalLogged)}
-                    sub={`of ${formatMinutes(kpis.monthlyExpected)} expected`}
+                    sub={t($ => $.monthly_of_expected, { value: formatMinutes(kpis.monthlyExpected) })}
                     icon={Clock}
                 />
                 <KpiCard
-                    label="Completion"
+                    label={t($ => $.monthly_completion)}
                     value={`${kpis.completionPct}%`}
-                    sub={`${kpis.completeDays}/${kpis.pastWorkDays} days on target`}
+                    sub={t($ => $.monthly_days_on_target, { done: kpis.completeDays, total: kpis.pastWorkDays })}
                     icon={TrendingUp}
                 />
                 <KpiCard
-                    label="Work days"
+                    label={t($ => $.monthly_work_days)}
                     value={`${kpis.completeDays}/${kpis.pastWorkDays}`}
-                    sub="days with full hours"
+                    sub={t($ => $.monthly_days_full_hours)}
                     icon={CalendarDays}
                 />
                 <KpiCard
-                    label="Entries"
+                    label={t($ => $.monthly_entries)}
                     value={String(kpis.totalEntries)}
                     sub={getMonthLabel(year, month)}
                     icon={Hash}
@@ -452,12 +454,12 @@ export function MonthlyCalendarView({ year, month }: { year: number; month: numb
             {/* Calendar grid */}
             <div className="rounded-lg border bg-card p-5">
                 <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-sm font-medium">Daily status</h2>
+                    <h2 className="text-sm font-medium">{t($ => $.monthly_daily_status)}</h2>
                     <div className="flex items-center gap-4">
                         <CalendarLegend />
                         {!activeCalendar && (
                             <span className="text-[11px] text-muted-foreground">
-                                Default 8h/day
+                                {t($ => $.monthly_default_hours)}
                             </span>
                         )}
                     </div>
@@ -465,7 +467,10 @@ export function MonthlyCalendarView({ year, month }: { year: number; month: numb
 
                 {/* Weekday headers */}
                 <div className="mb-1 grid grid-cols-7 gap-1">
-                    {WEEKDAY_HEADERS.map((day) => (
+                    {[
+                        t($ => $.day_mon), t($ => $.day_tue), t($ => $.day_wed), t($ => $.day_thu),
+                        t($ => $.day_fri), t($ => $.day_sat), t($ => $.day_sun),
+                    ].map((day) => (
                         <div
                             key={day}
                             className="px-2 py-1 text-[11px] font-medium text-muted-foreground"
@@ -491,10 +496,9 @@ export function MonthlyCalendarView({ year, month }: { year: number; month: numb
             {dashboardData && dashboardData.by_issue.length > 0 && (
                 <div className="rounded-lg border bg-card">
                     <div className="flex items-center justify-between border-b px-5 py-3">
-                        <h2 className="text-sm font-medium">Top issues</h2>
+                        <h2 className="text-sm font-medium">{t($ => $.monthly_top_issues)}</h2>
                         <span className="text-xs text-muted-foreground">
-                            {kpis.totalEntries}{" "}
-                            {kpis.totalEntries === 1 ? "entry" : "entries"}
+                            {t($ => $.monthly_entry_other, { count: kpis.totalEntries })}
                         </span>
                     </div>
                     <div className="divide-y">
