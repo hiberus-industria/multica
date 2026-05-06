@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   ChevronRight,
   Clock,
@@ -33,6 +33,7 @@ import type { TimeEntry } from "@multica/core/types";
 import { timeAgo } from "@multica/core/utils";
 import { toast } from "sonner";
 import { cn } from "@multica/ui/lib/utils";
+import { useT } from "../../i18n";
 
 // Smart duration parser: "2h", "30m", "1h30m", "1.5h", "90m", "1:30"
 function parseDuration(input: string): number | null {
@@ -120,6 +121,7 @@ export function IssueTimeSection({
   const currentUser = useAuthStore((s) => s.user);
   const activeTimer = useTimerStore((s) => s.activeTimer);
   const startTimer = useTimerStore((s) => s.startTimer);
+  const { t } = useT("time-tracking");
 
   const { data } = useQuery(issueTimeEntriesOptions(wsId, issueId));
   const entries = data?.time_entries ?? [];
@@ -129,7 +131,10 @@ export function IssueTimeSection({
     ...redmineActivitiesOptions(wsId),
     enabled: !!wsId,
   });
-  const activities = activitiesData?.activities ?? [];
+  const activities = useMemo(
+    () => activitiesData?.activities ?? [],
+    [activitiesData?.activities],
+  );
 
   const { data: linksData } = useQuery(
     issueIntegrationLinksOptions(wsId, issueId),
@@ -300,7 +305,7 @@ export function IssueTimeSection({
         onClick={() => setOpen(!open)}
       >
         <Clock className="size-3 shrink-0 text-muted-foreground" />
-        Time
+        {t(($) => $.ts_header)}
         {totalMinutes > 0 && (
           <span className="ml-auto text-[10px] font-normal text-muted-foreground tabular-nums">
             {formatMinutes(totalMinutes)}
@@ -326,7 +331,9 @@ export function IssueTimeSection({
               disabled={isTimerOnThisIssue}
             >
               <Play className="size-3 mr-1" />
-              {isTimerOnThisIssue ? "Timer running" : "Start timer"}
+              {isTimerOnThisIssue
+                ? t(($) => $.ts_timer_running)
+                : t(($) => $.ts_start_timer)}
             </Button>
             <Button
               variant="outline"
@@ -335,7 +342,7 @@ export function IssueTimeSection({
               onClick={() => setQuickLogOpen(!quickLogOpen)}
             >
               <Plus className="size-3 mr-1" />
-              Quick log
+              {t(($) => $.ts_quick_log)}
             </Button>
           </div>
 
@@ -368,8 +375,9 @@ export function IssueTimeSection({
               </div>
               {totalMinutes > estimatedMinutes && (
                 <p className="text-[10px] text-destructive">
-                  Over budget by{" "}
-                  {formatMinutes(totalMinutes - estimatedMinutes)}
+                  {t(($) => $.ts_over_budget, {
+                    amount: formatMinutes(totalMinutes - estimatedMinutes),
+                  })}
                 </p>
               )}
             </div>
@@ -432,7 +440,7 @@ export function IssueTimeSection({
                   onClick={handleQuickLog}
                   disabled={createEntry.isPending}
                 >
-                  Log time
+                  {t(($) => $.ts_log_time)}
                 </Button>
               </div>
             </div>
@@ -453,8 +461,7 @@ export function IssueTimeSection({
                   bulkRetry.isPending && "animate-spin",
                 )}
               />
-              Retry {failedCount} failed{" "}
-              {failedCount === 1 ? "entry" : "entries"}
+              {t(($) => $.ts_retry_failed, { count: failedCount })}
             </Button>
           )}
 
@@ -532,7 +539,7 @@ export function IssueTimeSection({
                           className="text-[11px]"
                           onClick={() => setEditingId(null)}
                         >
-                          Cancel
+                          {t(($) => $.ts_cancel)}
                         </Button>
                         <Button
                           size="xs"
@@ -540,7 +547,7 @@ export function IssueTimeSection({
                           onClick={handleSaveEdit}
                           disabled={updateEntry.isPending}
                         >
-                          Save
+                          {t(($) => $.ts_save)}
                         </Button>
                       </div>
                     </div>
@@ -567,7 +574,7 @@ export function IssueTimeSection({
                       <>
                         <span className="text-muted-foreground">·</span>
                         <span className="text-muted-foreground truncate italic">
-                          "{entry.comment}"
+                          &quot;{entry.comment}&quot;
                         </span>
                       </>
                     )}

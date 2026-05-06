@@ -29,6 +29,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell } from "recharts";
 import type { TimeEntrySyncStatus } from "@multica/core/types";
 import { MonthlyCalendarView } from "./monthly-calendar";
+import { useT } from "../i18n";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -76,8 +77,6 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
 const CHART_COLOR_KEYS = [
   "chart-1",
   "chart-2",
@@ -89,22 +88,15 @@ const CHART_COLOR_KEYS = [
   "chart-8",
 ] as const;
 
-const dailyChartConfig = {
-  hours: { label: "Hours", color: "var(--color-chart-1)" },
-} satisfies ChartConfig;
-
-const issueChartConfig = {
-  hours: { label: "Hours", color: "var(--color-chart-2)" },
-} satisfies ChartConfig;
-
 // ─── Sync status badge ───────────────────────────────────────────────────────
 
 function SyncBadge({ status }: { status: TimeEntrySyncStatus }) {
+  const { t } = useT("time-tracking");
   if (status === "synced") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
         <CheckCircle2 className="size-2.5" />
-        Synced
+        {t(($) => $.sync_synced)}
       </span>
     );
   }
@@ -112,7 +104,7 @@ function SyncBadge({ status }: { status: TimeEntrySyncStatus }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
         <AlertCircle className="size-2.5" />
-        Failed
+        {t(($) => $.sync_failed)}
       </span>
     );
   }
@@ -120,14 +112,14 @@ function SyncBadge({ status }: { status: TimeEntrySyncStatus }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
         <Loader2 className="size-2.5 animate-spin" />
-        Pending
+        {t(($) => $.sync_pending)}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
       <MinusCircle className="size-2.5" />
-      Not linked
+      {t(($) => $.sync_not_linked)}
     </span>
   );
 }
@@ -182,13 +174,12 @@ function DashboardSkeleton() {
 // ─── Empty state ─────────────────────────────────────────────────────────────
 
 function EmptyState() {
+  const { t } = useT("time-tracking");
   return (
     <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 text-muted-foreground">
       <Clock className="h-10 w-10 text-muted-foreground/40" />
-      <p className="text-sm">No time entries for this period</p>
-      <p className="text-xs">
-        Start a timer or log time on an issue to see your data here.
-      </p>
+      <p className="text-sm">{t(($) => $.empty_title)}</p>
+      <p className="text-xs">{t(($) => $.empty_subtitle)}</p>
     </div>
   );
 }
@@ -204,6 +195,7 @@ function ViewSegment({
   mode: ViewMode;
   setMode: (v: ViewMode) => void;
 }) {
+  const { t } = useT("time-tracking");
   return (
     <div className="flex items-center gap-0.5 rounded-md bg-muted p-0.5">
       <button
@@ -216,7 +208,7 @@ function ViewSegment({
             : "text-muted-foreground hover:text-foreground",
         )}
       >
-        Weekly
+        {t(($) => $.view_weekly)}
       </button>
       <button
         type="button"
@@ -228,7 +220,7 @@ function ViewSegment({
             : "text-muted-foreground hover:text-foreground",
         )}
       >
-        Monthly
+        {t(($) => $.view_monthly)}
       </button>
     </div>
   );
@@ -238,6 +230,7 @@ function ViewSegment({
 
 export function TimeTrackingDashboard() {
   const wsId = useWorkspaceId();
+  const { t } = useT("time-tracking");
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -247,6 +240,48 @@ export function TimeTrackingDashboard() {
   const [monthIdx, setMonthIdx] = useState(now.getMonth());
 
   const range = useMemo(() => getWeekRange(weekOffset), [weekOffset]);
+
+  const weekLabel =
+    weekOffset === 0
+      ? t(($) => $.week_this)
+      : weekOffset === -1
+        ? t(($) => $.week_last)
+        : range.label;
+
+  const dailyChartConfig = useMemo(
+    () =>
+      ({
+        hours: {
+          label: t(($) => $.chart_hours_label),
+          color: "var(--color-chart-1)",
+        },
+      }) satisfies ChartConfig,
+    [t],
+  );
+
+  const issueChartConfig = useMemo(
+    () =>
+      ({
+        hours: {
+          label: t(($) => $.chart_hours_label),
+          color: "var(--color-chart-2)",
+        },
+      }) satisfies ChartConfig,
+    [t],
+  );
+
+  const DAY_NAMES = useMemo(
+    () => [
+      t(($) => $.day_mon),
+      t(($) => $.day_tue),
+      t(($) => $.day_wed),
+      t(($) => $.day_thu),
+      t(($) => $.day_fri),
+      t(($) => $.day_sat),
+      t(($) => $.day_sun),
+    ],
+    [t],
+  );
 
   const { data, isLoading } = useQuery({
     ...dashboardOptions(wsId, range.start, range.end),
@@ -277,7 +312,7 @@ export function TimeTrackingDashboard() {
       minutes: byDay.get(idx)?.minutes ?? 0,
       isToday: idx === todayDayIdx,
     }));
-  }, [data?.daily, todayDayIdx]);
+  }, [data?.daily, todayDayIdx, DAY_NAMES]);
 
   // Activity breakdown sorted descending
   const activityData = useMemo(() => {
@@ -287,13 +322,13 @@ export function TimeTrackingDashboard() {
       .slice()
       .sort((a, b) => b.total_minutes - a.total_minutes)
       .map((a, i) => ({
-        name: a.activity || "No activity",
+        name: a.activity || t(($) => $.no_activity),
         key: `act-${i}`,
         value: a.total_minutes,
         pct: total > 0 ? Math.round((a.total_minutes / total) * 100) : 0,
         colorKey: CHART_COLOR_KEYS[i % CHART_COLOR_KEYS.length]!,
       }));
-  }, [data?.by_activity, data?.total_minutes]);
+  }, [data?.by_activity, data?.total_minutes, t]);
 
   const activityChartConfig = useMemo(
     () =>
@@ -334,12 +369,12 @@ export function TimeTrackingDashboard() {
     );
     return {
       total: formatMinutes(data.total_minutes),
-      totalSub: `${data.entries.length} entr${data.entries.length === 1 ? "y" : "ies"}`,
+      totalSub: t(($) => $.kpi_entry, { count: data.entries.length }),
       avg: avgMinutes > 0 ? formatMinutes(avgMinutes) : "—",
       avgSub:
         activeDays > 0
-          ? `${activeDays} active day${activeDays > 1 ? "s" : ""}`
-          : "no logged days",
+          ? t(($) => $.kpi_active_day, { count: activeDays })
+          : t(($) => $.kpi_no_logged_days),
       peak:
         peak && peak.total_minutes > 0
           ? formatMinutes(peak.total_minutes)
@@ -349,15 +384,18 @@ export function TimeTrackingDashboard() {
       entries: String(data.entries.length),
       entriesSub: `${formatDate(data.start_date)} – ${formatDate(data.end_date)}`,
     };
-  }, [data]);
+  }, [data, t]);
 
   // Month navigation helpers
   const isCurrentMonth =
     monthYear === now.getFullYear() && monthIdx === now.getMonth();
-  const monthLabel = new Date(monthYear, monthIdx, 1).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const monthLabel = new Date(monthYear, monthIdx, 1).toLocaleDateString(
+    "en-US",
+    {
+      month: "long",
+      year: "numeric",
+    },
+  );
 
   function goToPreviousMonth() {
     if (monthIdx === 0) {
@@ -388,7 +426,7 @@ export function TimeTrackingDashboard() {
       <PageHeader className="justify-between px-5">
         <div className="flex items-center gap-3">
           <Clock className="size-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Time Tracking</span>
+          <span className="text-sm font-medium">{t(($) => $.header)}</span>
           <ViewSegment mode={viewMode} setMode={setViewMode} />
         </div>
         <div className="flex items-center gap-1">
@@ -411,7 +449,7 @@ export function TimeTrackingDashboard() {
                 )}
                 onClick={() => setWeekOffset(0)}
               >
-                {range.label}
+                {weekLabel}
               </Button>
               <Button
                 variant="ghost"
@@ -474,25 +512,25 @@ export function TimeTrackingDashboard() {
               {/* KPI row */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <KpiCard
-                  label="Total logged"
+                  label={t(($) => $.kpi_total_logged)}
                   value={kpis!.total}
                   sub={kpis!.totalSub}
                   icon={Clock}
                 />
                 <KpiCard
-                  label="Avg per active day"
+                  label={t(($) => $.kpi_avg_per_day)}
                   value={kpis!.avg}
                   sub={kpis!.avgSub}
                   icon={TrendingUp}
                 />
                 <KpiCard
-                  label="Peak day"
+                  label={t(($) => $.kpi_peak_day)}
                   value={kpis!.peak}
                   sub={kpis!.peakSub}
                   icon={CalendarDays}
                 />
                 <KpiCard
-                  label="Entries"
+                  label={t(($) => $.kpi_entries_label)}
                   value={kpis!.entries}
                   sub={kpis!.entriesSub}
                   icon={Hash}
@@ -508,7 +546,9 @@ export function TimeTrackingDashboard() {
               >
                 {/* Daily breakdown */}
                 <div className="rounded-lg border bg-card p-5">
-                  <h2 className="mb-4 text-sm font-medium">Daily breakdown</h2>
+                  <h2 className="mb-4 text-sm font-medium">
+                    {t(($) => $.section_daily_breakdown)}
+                  </h2>
                   <ChartContainer
                     config={dailyChartConfig}
                     className="h-60 w-full"
@@ -563,7 +603,9 @@ export function TimeTrackingDashboard() {
                 {/* Activity breakdown */}
                 {activityData.length > 0 && (
                   <div className="rounded-lg border bg-card p-5">
-                    <h2 className="mb-4 text-sm font-medium">By activity</h2>
+                    <h2 className="mb-4 text-sm font-medium">
+                      {t(($) => $.section_by_activity)}
+                    </h2>
                     <div className="flex items-center gap-5">
                       <ChartContainer
                         config={activityChartConfig}
@@ -632,7 +674,9 @@ export function TimeTrackingDashboard() {
               {/* Top issues */}
               {issueData.length > 0 && (
                 <div className="rounded-lg border bg-card p-5">
-                  <h2 className="mb-4 text-sm font-medium">Top issues</h2>
+                  <h2 className="mb-4 text-sm font-medium">
+                    {t(($) => $.section_top_issues)}
+                  </h2>
                   <ChartContainer
                     config={issueChartConfig}
                     className="w-full"
@@ -692,10 +736,13 @@ export function TimeTrackingDashboard() {
               {/* Entries table */}
               <div className="rounded-lg border bg-card">
                 <div className="flex items-center justify-between border-b px-5 py-3">
-                  <h2 className="text-sm font-medium">All entries</h2>
+                  <h2 className="text-sm font-medium">
+                    {t(($) => $.section_all_entries)}
+                  </h2>
                   <span className="text-xs text-muted-foreground">
-                    {data!.entries.length}{" "}
-                    {data!.entries.length === 1 ? "entry" : "entries"}
+                    {t(($) => $.kpi_entry, {
+                      count: data!.entries.length,
+                    })}
                   </span>
                 </div>
                 <div className="overflow-x-auto">
@@ -703,19 +750,19 @@ export function TimeTrackingDashboard() {
                     <thead>
                       <tr className="border-b bg-muted/30">
                         <th className="whitespace-nowrap px-5 py-2 text-left font-medium text-muted-foreground">
-                          Date
+                          {t(($) => $.table_date)}
                         </th>
                         <th className="px-4 py-2 text-left font-medium text-muted-foreground">
-                          Issue
+                          {t(($) => $.table_issue)}
                         </th>
                         <th className="whitespace-nowrap px-4 py-2 text-right font-medium text-muted-foreground">
-                          Duration
+                          {t(($) => $.table_duration)}
                         </th>
                         <th className="px-4 py-2 text-left font-medium text-muted-foreground">
-                          Activity
+                          {t(($) => $.table_activity)}
                         </th>
                         <th className="px-5 py-2 text-left font-medium text-muted-foreground">
-                          Sync
+                          {t(($) => $.table_sync)}
                         </th>
                       </tr>
                     </thead>
