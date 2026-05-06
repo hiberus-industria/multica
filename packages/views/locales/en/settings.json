@@ -25,7 +25,10 @@
       "general": "General",
       "repositories": "Repositories",
       "labs": "Labs",
-      "members": "Members"
+      "members": "Members",
+      "user_integrations": "Integrations",
+      "work_calendars": "Work Calendars",
+      "integrations": "Integrations"
     }
   },
   "account": {
@@ -63,6 +66,10 @@
       "agent_activity": {
         "label": "Agent activity",
         "description": "When an agent task completes or fails"
+      },
+      "time_tracking": {
+        "label": "Time tracking reminders",
+        "description": "Daily reminder when you haven't logged the required hours based on the work calendar"
       }
     }
   },

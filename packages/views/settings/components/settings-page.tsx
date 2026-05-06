@@ -39,14 +39,14 @@ const ACCOUNT_TAB_KEYS = [
   "appearance",
   "notifications",
   "tokens",
-  "user-integrations",
+  "user_integrations",
 ] as const;
 const ACCOUNT_TAB_ICONS = {
   profile: User,
   appearance: Palette,
   notifications: Bell,
   tokens: Key,
-  userIntegrations: KeyRound,
+  user_integrations: KeyRound,
 } as const;
 
 const WORKSPACE_TAB_KEYS = [
@@ -54,7 +54,7 @@ const WORKSPACE_TAB_KEYS = [
   "repositories",
   "labs",
   "members",
-  "work-calendars",
+  "work_calendars",
   "integrations",
 ] as const;
 const WORKSPACE_TAB_VALUES = {
@@ -62,7 +62,7 @@ const WORKSPACE_TAB_VALUES = {
   repositories: "repositories",
   labs: "labs",
   members: "members",
-  workCalendars: "work calendars",
+  work_calendars: "work calendars",
   integrations: "integrations",
 } as const;
 const WORKSPACE_TAB_ICONS = {
@@ -70,7 +70,7 @@ const WORKSPACE_TAB_ICONS = {
   repositories: FolderGit2,
   labs: FlaskConical,
   members: Users,
-  workCalendars: CalendarDays,
+  work_calendars: CalendarDays,
   integrations: Plug,
 } as const;
 
@@ -153,7 +153,7 @@ export function SettingsPage({ extraAccountTabs }: SettingsPageProps = {}) {
           <TabsContent value="tokens">
             <TokensTab />
           </TabsContent>
-          <TabsContent value="user-integrations">
+          <TabsContent value="user_integrations">
             <UserIntegrationsTab />
           </TabsContent>
           <TabsContent value="workspace">
