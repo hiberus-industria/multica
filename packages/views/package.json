@@ -41,6 +41,9 @@
     "./invitations": "./invitations/index.ts",
     "./onboarding": "./onboarding/index.ts",
     "./platform": "./platform/index.ts",
+    "./i18n": "./i18n/index.ts",
+    "./locales": "./locales/index.ts",
+    "./locales/*": "./locales/*",
     "./time-tracking/timer-play-button": "./time-tracking/timer-play-button.tsx",
     "./time-tracking/sidebar-timer-indicator": "./time-tracking/sidebar-timer-indicator.tsx",
     "./time-tracking/idle-detector": "./time-tracking/idle-detector.tsx",
@@ -95,9 +98,11 @@
   "peerDependencies": {
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",
+    "i18next": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-i18next": "catalog:",
     "zustand": "catalog:"
   },
   "devDependencies": {
@@ -108,6 +113,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "eslint-plugin-i18next": "catalog:",
     "jsdom": "catalog:",
     "rehype-sanitize": "^6.0.0",
     "typescript": "catalog:",

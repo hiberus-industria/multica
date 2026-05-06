@@ -23,6 +23,7 @@ import { ProgressRing } from "./progress-ring";
 import type { ChildProgress } from "./list-row";
 import { IssueActionsContextMenu } from "../actions";
 import { LabelChip } from "../../labels/label-chip";
+import { useT } from "../../i18n";
 import { TimerPlayButton } from "../../time-tracking/timer-play-button";
 
 function formatDate(date: string): string {
@@ -54,6 +55,7 @@ export const BoardCardContent = memo(function BoardCardContent({
   editable?: boolean;
   childProgress?: ChildProgress;
 }) {
+  const { t } = useT("issues");
   const storeProperties = useViewStore((s) => s.cardProperties);
   const priorityCfg = PRIORITY_CONFIG[issue.priority];
   const wsId = useWorkspaceId();
@@ -71,10 +73,10 @@ export const BoardCardContent = memo(function BoardCardContent({
     (updates: Partial<UpdateIssueRequest>) => {
       updateIssueMutation.mutate(
         { id: issue.id, ...updates },
-        { onError: () => toast.error("Failed to update issue") },
+        { onError: () => toast.error(t(($) => $.card.update_failed)) },
       );
     },
-    [issue.id, updateIssueMutation],
+    [issue.id, updateIssueMutation, t],
   );
 
   const showPriority = storeProperties.priority;
@@ -180,7 +182,7 @@ export const BoardCardContent = memo(function BoardCardContent({
                         className="h-3 w-3"
                         inheritColor
                       />
-                      {priorityCfg.label}
+                      {t(($) => $.priority[issue.priority])}
                     </span>
                   }
                 />

@@ -35,6 +35,7 @@ import {
 import { inboxKeys } from "../inbox/queries";
 import { workspaceKeys, workspaceListOptions } from "../workspace/queries";
 import { chatKeys } from "../chat/queries";
+import { useChatStore } from "../chat";
 import { timeEntryKeys } from "../time-entries/queries";
 import { resolvePostAuthDestination, useHasOnboarded } from "../paths";
 import type {
@@ -231,6 +232,7 @@ export function useRealtimeSync(
       "chat:message",
       "chat:done",
       "chat:session_read",
+      "chat:session_deleted",
       // task:message stays out of the prefix path because it fires per
       // streamed message during a long run — invalidating the snapshot on
       // every message would flood the network. Specific chat handlers below
@@ -706,6 +708,35 @@ export function useRealtimeSync(
       invalidateSessionLists();
     });
 
+    // chat:session_deleted fires after a hard delete. The originating tab has
+    // already optimistically dropped the row via useDeleteChatSession; this
+    // handler keeps OTHER tabs/devices in sync and also clears the active
+    // session pointer so a deleted session doesn't keep the chat window
+    // pointed at vanished messages.
+    const unsubChatSessionDeleted = ws.on("chat:session_deleted", (p) => {
+      const payload = p as { chat_session_id: string };
+      chatWsLogger.info("chat:session_deleted (global)", payload);
+      const id = getCurrentWsId();
+      if (id) {
+        const drop = (old?: { id: string }[]) =>
+          old?.filter((s) => s.id !== payload.chat_session_id);
+        qc.setQueryData(chatKeys.sessions(id), drop);
+        qc.setQueryData(chatKeys.allSessions(id), drop);
+      }
+      qc.removeQueries({
+        queryKey: chatKeys.messages(payload.chat_session_id),
+      });
+      qc.removeQueries({
+        queryKey: chatKeys.pendingTask(payload.chat_session_id),
+      });
+      invalidatePendingAggregate();
+
+      const chatState = useChatStore.getState?.();
+      if (chatState && chatState.activeSessionId === payload.chat_session_id) {
+        chatState.setActiveSession(null);
+      }
+    });
+
     return () => {
       unsubAny();
       unsubIssueUpdated();
@@ -742,6 +773,7 @@ export function useRealtimeSync(
       unsubTaskCompleted();
       unsubTaskFailed();
       unsubChatSessionRead();
+      unsubChatSessionDeleted();
       timers.forEach(clearTimeout);
       timers.clear();
     };
