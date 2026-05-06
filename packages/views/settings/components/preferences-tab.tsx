@@ -50,10 +50,7 @@ function WindowMockup({
         <span className="size-[6px] rounded-full bg-[#28c840]" />
       </div>
       {/* Content area */}
-      <div
-        className="flex flex-1"
-        style={{ backgroundColor: colors.content }}
-      >
+      <div className="flex flex-1" style={{ backgroundColor: colors.content }}>
         {/* Sidebar */}
         <div
           className="w-[30%] space-y-1 p-2"
@@ -112,6 +109,7 @@ export function PreferencesTab() {
   const languageOptions: { value: SupportedLocale; label: string }[] = [
     { value: "en", label: t(($) => $.preferences.language.english) },
     { value: "zh-Hans", label: t(($) => $.preferences.language.chinese) },
+    { value: "es", label: t(($) => $.preferences.language.spanish) },
   ];
 
   // Persist locally → sync to user.language → reload. Reload (vs in-place
@@ -167,7 +165,7 @@ export function PreferencesTab() {
                     "aspect-[4/3] w-36 overflow-hidden rounded-lg ring-1 transition-all",
                     active
                       ? "ring-2 ring-brand"
-                      : "ring-border hover:ring-2 hover:ring-border"
+                      : "ring-border hover:ring-2 hover:ring-border",
                   )}
                 >
                   {opt.value === "system" ? (
@@ -190,7 +188,7 @@ export function PreferencesTab() {
                     "text-sm transition-colors",
                     active
                       ? "font-medium text-foreground"
-                      : "text-muted-foreground"
+                      : "text-muted-foreground",
                   )}
                 >
                   {opt.label}
@@ -218,7 +216,7 @@ export function PreferencesTab() {
                   "rounded-md border px-4 py-2 text-sm transition-colors",
                   active
                     ? "border-brand bg-brand/10 font-medium text-foreground"
-                    : "border-border text-muted-foreground hover:border-foreground/30"
+                    : "border-border text-muted-foreground hover:border-foreground/30",
                 )}
               >
                 {opt.label}
