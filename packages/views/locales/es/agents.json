@@ -212,6 +212,8 @@
     "runtime_none": "No hay runtime disponible",
     "runtime_register_first": "Registra un runtime antes de crear un agente",
     "runtime_cloud_badge": "Nube",
+    "runtime_private_badge": "Privado",
+    "runtime_private_locked_tooltip": "Runtime privado — solo su propietario o un administrador del espacio de trabajo puede crear agentes en él. Pide al propietario que lo cambie a Público para compartirlo.",
     "duplicate_copy_suffix": " (Copia)",
     "create": "Crear",
     "creating": "Creando...",

@@ -162,6 +162,22 @@
     "co_authored_by_description_suffix": "a los commits realizados por agentes.",
     "toast_failed": "Error al actualizar la configuración"
   },
+  "integrations": {
+    "section_title": "Integraciones",
+    "github_title": "GitHub",
+    "github_description_prefix": "Vincula incidencias a pull requests automáticamente. Cuando un PR con",
+    "github_description_suffix": "en su rama, título o cuerpo se fusiona, la incidencia correspondiente pasa a",
+    "github_description_done": "Completado",
+    "github_identifier_example": "MUL-123",
+    "connect_github": "Conectar GitHub",
+    "connect_opening": "Abriendo…",
+    "connect_disabled_tooltip": "La aplicación de GitHub no está configurada en este servidor",
+    "not_configured": "La integración de GitHub no está configurada para este despliegue. Los operadores deben configurar",
+    "not_configured_and": "y",
+    "manage_hint": "Solo los admins y propietarios pueden gestionar las integraciones.",
+    "toast_not_configured": "La integración de GitHub no está configurada para este despliegue",
+    "toast_open_failed": "Error al abrir la instalación de GitHub"
+  },
   "repositories": {
     "section_title": "Repositorios",
     "description": "Repositorios Git asociados a este espacio de trabajo. Los agentes los usan para clonar y trabajar en el código.",

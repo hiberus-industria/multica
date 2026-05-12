@@ -64,7 +64,18 @@
     "no_agents": "Ningún agente está vinculado a este entorno todavía.",
     "diagnostics_title": "Diagnóstico",
     "diagnostics_cli": "CLI",
+    "diagnostics_visibility": "Visibilidad",
     "diagnostics_timezone": "Zona horaria",
+    "visibility_label": {
+      "private": "Privado",
+      "public": "Público"
+    },
+    "visibility_hint": {
+      "private": "Solo tú y los administradores del espacio de trabajo podéis crear agentes en este runtime.",
+      "public": "Cualquier miembro del espacio de trabajo puede crear agentes en este runtime."
+    },
+    "visibility_toast_updated": "Visibilidad establecida a {{visibility}}",
+    "visibility_toast_failed": "Error al actualizar la visibilidad",
     "timezone_browser_suffix": " (navegador)",
     "timezone_hint": "Los gráficos de uso de tokens en este runtime agrupan las fechas según esta zona horaria.",
     "timezone_toast_updated": "Zona horaria actualizada a {{tz}}",

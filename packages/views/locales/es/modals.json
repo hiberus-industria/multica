@@ -22,14 +22,15 @@
   },
   "feedback": {
     "title": "Comentarios",
-    "description": "Nos encantaría saber qué funciona, qué no, o qué te gustaría ver próximamente.",
     "placeholder": "Cuéntanos tu experiencia, errores que hayas encontrado, o funciones que te gustaría ver…",
     "toast_uploading": "Por favor espera a que terminen las subidas…",
     "toast_too_long": "El mensaje es demasiado largo",
     "toast_sent": "¡Gracias por los comentarios!",
     "toast_failed": "Error al enviar los comentarios",
     "send": "Enviar comentarios",
-    "sending": "Enviando…"
+    "sending": "Enviando…",
+    "github_hint_prefix": "¿Quieres una gestión más rápida y debate abierto? Ve a ",
+    "github_hint_link": "GitHub"
   },
   "issue_picker": {
     "search_placeholder": "Buscar tareas...",

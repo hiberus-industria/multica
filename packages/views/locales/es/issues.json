@@ -98,8 +98,15 @@
     "add_sub_issue_aria": "Añadir subincidencia",
     "section_properties": "Propiedades",
     "section_parent_issue": "Incidencia padre",
+    "section_pull_requests": "Pull requests",
     "section_details": "Detalles",
     "section_token_usage": "Uso de tokens",
+    "pull_requests_loading": "Cargando…",
+    "pull_requests_empty": "Aún no hay pull requests vinculados. Referencia el identificador de esta incidencia en la rama, título o cuerpo de un PR para vincularlo automáticamente.",
+    "pull_request_state_open": "Abierto",
+    "pull_request_state_draft": "Borrador",
+    "pull_request_state_merged": "Fusionado",
+    "pull_request_state_closed": "Cerrado",
     "prop_status": "Estado",
     "prop_priority": "Prioridad",
     "prop_assignee": "Asignado",
@@ -126,6 +133,8 @@
     "pin_tooltip": "Fijar en la barra lateral",
     "unpin_tooltip": "Desfijar de la barra lateral",
     "sidebar_tooltip": "Alternar barra lateral",
+    "cmdf_toast_title": "Buscar en la página solo cubre lo que está visible",
+    "cmdf_toast_description": "La línea de tiempo es virtualizada — ⌘F no puede ver los comentarios fuera de pantalla. La búsqueda completa en la app está en camino.",
     "update_failed": "Error al actualizar la incidencia",
     "link_copied": "Enlace copiado",
     "link_copy_failed": "Error al copiar el enlace",
@@ -229,6 +238,13 @@
     "status_completed": "Completado",
     "status_failed": "Fallido",
     "status_cancelled": "Cancelado"
+  },
+  "terminate_dialog": {
+    "title": "¿Detener esta tarea?",
+    "body": "La tarea se cancelará y no se podrá reanudar.",
+    "running_note": " El trabajo en ejecución puede tardar unos segundos en detenerse por completo.",
+    "keep": "Mantener en ejecución",
+    "confirm": "Detener tarea"
   },
   "batch": {
     "selected": "{{count}} seleccionados",
