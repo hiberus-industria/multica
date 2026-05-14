@@ -210,7 +210,6 @@
     "runtime_filter_all": "All",
     "runtime_loading": "Loading runtimes...",
     "runtime_none": "No runtime available",
-    "runtime_register_first": "Register a runtime before creating an agent",
     "runtime_cloud_badge": "Cloud",
     "runtime_private_badge": "Private",
     "runtime_private_locked_tooltip": "Private runtime — only its owner or a workspace admin can create agents on it. Ask the owner to switch it to Public to share.",
@@ -225,6 +224,7 @@
     "template_created_with_reuse_toast_one": "Agent \"{{name}}\" created. Reused {{count}} existing skill.",
     "template_created_with_reuse_toast_other": "Agent \"{{name}}\" created. Reused {{count}} existing skills.",
     "skill_attach_failed_toast": "Agent created, but failed to attach skills: {{error}}",
+    "squad_join_failed_toast": "Agent \"{{name}}\" was created but couldn't join the squad: {{error}}. You can add it manually from Members.",
     "chooser": {
       "blank_title": "Start blank",
       "blank_desc": "Write everything yourself.",
@@ -235,11 +235,13 @@
       "title": "Pick a template",
       "empty": "No templates available yet.",
       "load_failed": "Failed to load templates",
-      "other_category": "Other"
+      "other_category": "Other",
+      "filter_all": "All"
     },
     "template_card": {
       "skills_one": "{{count}} skill",
-      "skills_other": "{{count}} skills"
+      "skills_other": "{{count}} skills",
+      "prompt_only": "Prompt only"
     },
     "template_detail": {
       "load_failed": "Failed to load template",
