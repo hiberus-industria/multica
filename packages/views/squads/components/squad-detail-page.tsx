@@ -14,7 +14,7 @@ import { CreateAgentDialog } from "../../agents/components/create-agent-dialog";
 import { useNavigation } from "../../navigation";
 import { AppLink } from "../../navigation";
 import { PageHeader } from "../../layout/page-header";
-import { Users, Plus, Trash2, ArrowLeft, Crown, Camera, Loader2, Pencil, FileText, Save } from "lucide-react";
+import { Users, Plus, Trash2, ArrowLeft, ArrowUpRight, Crown, Camera, Loader2, Pencil, FileText, Save } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
 import { Input } from "@multica/ui/components/ui/input";
 import { Label } from "@multica/ui/components/ui/label";
@@ -23,6 +23,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@multica/ui/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@multica/ui/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -247,18 +252,17 @@ export function SquadDetailPage() {
       )}
 
       {/* Squad-scoped create flow: same dialog as the Agents page but
-          with squadId set, so the dialog runs addSquadMember after
-          createAgent / createAgentFromTemplate and skips the
-          agent-detail navigation. Only mounted for workspace
-          owner/admin since AddSquadMember is owner/admin-gated
-          server-side; for everyone else the trigger never renders. */}
+          with squadId set, so the dialog runs api.addSquadMember after
+          api.createAgent and skips the agent-detail navigation. Only
+          mounted for workspace owner/admin since AddSquadMember is
+          owner/admin-gated server-side; for everyone else the trigger
+          never renders. */}
       {showCreateAgent && isWorkspaceAdmin && (
         <CreateAgentDialog
           runtimes={runtimes}
           runtimesLoading={runtimesLoading}
           members={wsMembers}
           currentUserId={currentUser?.id ?? null}
-          existingAgentNames={agents.map((a: Agent) => a.name)}
           squadId={squadId}
           onClose={() => setShowCreateAgent(false)}
           onCreate={handleCreateAgent}
@@ -969,7 +973,7 @@ function SquadOverviewPane({
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === "members" && (
-          <div className="mx-auto flex h-full max-w-2xl flex-col p-4 md:p-6">
+          <div className="flex h-full flex-col p-4 md:p-6">
             <SquadMembersTab
               members={members}
               isLeader={isLeader}
@@ -984,7 +988,7 @@ function SquadOverviewPane({
           </div>
         )}
         {activeTab === "instructions" && (
-          <div className="mx-auto flex h-full max-w-2xl flex-col p-4 md:p-6">
+          <div className="flex h-full flex-col p-4 md:p-6">
             <SquadInstructionsTab
               squad={squad}
               onSave={onSaveInstructions}
@@ -1040,6 +1044,7 @@ function SquadMembersTab({
   setLeaderPending: boolean;
 }) {
   const { t } = useT("squads");
+  const p = useWorkspacePaths();
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -1066,7 +1071,14 @@ function SquadMembersTab({
       <div className="space-y-2">
         {members.map((m) => (
           <div key={m.id} className="group flex items-start gap-3 rounded-lg border p-3">
-            <ActorAvatar actorType={m.member_type} actorId={m.member_id} size={32} showStatusDot />
+            <ActorAvatar
+              actorType={m.member_type}
+              actorId={m.member_id}
+              size={32}
+              showStatusDot
+              enableHoverCard={m.member_type === "agent"}
+              hoverCardVariant="live"
+            />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{getEntityName(m.member_type, m.member_id)}</span>
@@ -1083,29 +1095,65 @@ function SquadMembersTab({
                 onSave={async (next) => { await onUpdateRole(m, next); }}
               />
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+              {m.member_type === "agent" && (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <AppLink
+                        href={p.agentDetail(m.member_id)}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                        aria-label={t(($) => $.members_tab.view_agent_tooltip)}
+                      >
+                        <ArrowUpRight className="size-3.5" />
+                      </AppLink>
+                    }
+                  />
+                  <TooltipContent>
+                    {t(($) => $.members_tab.view_agent_tooltip)}
+                  </TooltipContent>
+                </Tooltip>
+              )}
               {m.member_type === "agent" && !isLeader(m) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground hover:text-amber-600 h-8 px-2"
-                  title="Make leader"
-                  onClick={() => onSetLeader(m.member_id)}
-                  disabled={setLeaderPending}
-                >
-                  <Crown className="size-3.5" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-amber-600 h-8 w-8 p-0"
+                        onClick={() => onSetLeader(m.member_id)}
+                        disabled={setLeaderPending}
+                        aria-label={t(($) => $.members_tab.make_leader_tooltip)}
+                      >
+                        <Crown className="size-3.5" />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    {t(($) => $.members_tab.make_leader_tooltip)}
+                  </TooltipContent>
+                </Tooltip>
               )}
               {!isLeader(m) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
-                  title="Remove from squad"
-                  onClick={() => onRemoveMember(m)}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
+                        onClick={() => onRemoveMember(m)}
+                        aria-label={t(($) => $.members_tab.remove_member_tooltip)}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    }
+                  />
+                  <TooltipContent>
+                    {t(($) => $.members_tab.remove_member_tooltip)}
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           </div>

@@ -174,6 +174,7 @@ vi.mock("@multica/core/issues/queries", () => ({
 }));
 vi.mock("@multica/core/issues/stores/create-mode-store", () => ({
   useCreateModeStore: { getState: () => ({ lastMode: "agent" }) },
+  openCreateIssueWithPreference: vi.fn(),
 }));
 vi.mock("@multica/core/issues/stores/draft-store", () => ({
   useIssueDraftStore: () => false,
