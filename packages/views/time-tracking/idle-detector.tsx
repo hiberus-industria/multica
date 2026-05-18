@@ -6,7 +6,11 @@ import {
   useIdleStore,
   startIdleTracking,
 } from "@multica/core/time-entries/idle-store";
-import { useCreateTimeEntry } from "@multica/core/time-entries/mutations";
+import {
+  useCreateTimeEntry,
+  useStopTimer,
+  useDiscardTimer,
+} from "@multica/core/time-entries/mutations";
 import { Button } from "@multica/ui/components/ui/button";
 import { toast } from "sonner";
 import { useT } from "../i18n";
@@ -26,11 +30,12 @@ function formatDuration(ms: number): string {
 export function IdleDetector() {
   const { t } = useT("time-tracking");
   const timer = useTimerStore((s) => s.activeTimer);
-  const stopTimer = useTimerStore((s) => s.stopTimer);
   const isIdle = useIdleStore((s) => s.isIdle);
   const idleSince = useIdleStore((s) => s.idleSince);
   const dismissIdle = useIdleStore((s) => s.dismissIdle);
   const createEntry = useCreateTimeEntry();
+  const stopTimer = useStopTimer();
+  const discardTimer = useDiscardTimer();
   const [visible, setVisible] = useState(false);
 
   // Start tracking when component mounts
@@ -61,62 +66,50 @@ export function IdleDetector() {
     const startedAt = new Date(timer.startedAt).toISOString();
     const stoppedAt = new Date(idleSince).toISOString();
 
-    // Clear the timer store
-    useTimerStore.getState().discardTimer();
+    // Discard the backend timer (no time entry), then create a custom one.
+    discardTimer.mutate(undefined, {
+      onSettled: () => {
+        createEntry.mutate(
+          {
+            issueId: timer.issueId,
+            data: {
+              duration_minutes: durationMinutes,
+              redmine_activity_id: timer.activityId,
+              activity_name: timer.activityName,
+              spent_on: new Date().toISOString().split("T")[0],
+              timer_started_at: startedAt,
+              timer_stopped_at: stoppedAt,
+            },
+          },
+          {
+            onSuccess: (entry) => {
+              const syncLabel =
+                entry.sync_status === "synced" ? " → synced to Redmine" : "";
+              toast.success(
+                `Logged ${formatDuration(activeMs)} (idle time excluded)${syncLabel}`,
+              );
+            },
+          },
+        );
+      },
+    });
     dismissIdle();
     setVisible(false);
-
-    createEntry.mutate(
-      {
-        issueId: timer.issueId,
-        data: {
-          duration_minutes: durationMinutes,
-          redmine_activity_id: timer.activityId,
-          activity_name: timer.activityName,
-          spent_on: new Date().toISOString().split("T")[0],
-          timer_started_at: startedAt,
-          timer_stopped_at: stoppedAt,
-        },
-      },
-      {
-        onSuccess: (entry) => {
-          const syncLabel =
-            entry.sync_status === "synced" ? " → synced to Redmine" : "";
-          toast.success(
-            `Logged ${formatDuration(activeMs)} (idle time excluded)${syncLabel}`,
-          );
-        },
-      },
-    );
-  }, [timer, idleSince, dismissIdle, createEntry]);
+  }, [timer, idleSince, dismissIdle, discardTimer, createEntry]);
 
   const handleStopAndLog = useCallback(() => {
-    const result = stopTimer();
-    if (!result) return;
+    stopTimer.mutate(undefined, {
+      onSuccess: (entry) => {
+        const syncLabel =
+          entry.sync_status === "synced" ? " → synced to Redmine" : "";
+        toast.success(
+          `Logged ${formatDuration(entry.duration_minutes * 60000)} (including idle)${syncLabel}`,
+        );
+      },
+    });
     dismissIdle();
     setVisible(false);
-
-    createEntry.mutate(
-      {
-        issueId: result.issueId,
-        data: {
-          duration_minutes: result.durationMinutes,
-          spent_on: new Date().toISOString().split("T")[0],
-          timer_started_at: result.startedAt,
-          timer_stopped_at: result.stoppedAt,
-        },
-      },
-      {
-        onSuccess: (entry) => {
-          const syncLabel =
-            entry.sync_status === "synced" ? " → synced to Redmine" : "";
-          toast.success(
-            `Logged ${formatDuration(result.durationMinutes * 60000)} (including idle)${syncLabel}`,
-          );
-        },
-      },
-    );
-  }, [stopTimer, dismissIdle, createEntry]);
+  }, [stopTimer, dismissIdle]);
 
   if (!visible || !timer || !idleSince) return null;
 
@@ -129,7 +122,7 @@ export function IdleDetector() {
         <p className="mb-4 text-xs text-muted-foreground">
           {t($ => $.idle_body, {
             duration: formatDuration(idleDuration),
-            issue: timer.issueIdentifier,
+            issue: `HIB-${timer.issueNumber}`,
           })}
         </p>
         <div className="flex flex-col gap-2">

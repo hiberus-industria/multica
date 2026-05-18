@@ -39,6 +39,7 @@ import { workspaceKeys, workspaceListOptions } from "../workspace/queries";
 import { chatKeys } from "../chat/queries";
 import { useChatStore } from "../chat";
 import { timeEntryKeys } from "../time-entries/queries";
+import { useTimerStore } from "../time-entries/timer-store";
 import { resolvePostAuthDestination, useHasOnboarded } from "../paths";
 import type {
   MemberAddedPayload,
@@ -334,6 +335,8 @@ export function useRealtimeSync(
       "time_entry:created",
       "time_entry:updated",
       "time_entry:deleted",
+      "timer:stopped",
+      "timer:discarded",
       // Chat events are handled explicitly below; do not double-invalidate.
       "chat:message",
       "chat:done",
@@ -578,6 +581,29 @@ export function useRealtimeSync(
         qc.invalidateQueries({
           queryKey: timeEntryKeys.issueEntries(wsId, issue_id),
         });
+      }
+    });
+
+    // --- Timer events (clear local timer state when backend stops/discards) ---
+
+    const unsubTimerStopped = ws.on("timer:stopped", (p) => {
+      const wsId = getCurrentWsId();
+      const { issue_id, time_entry } = p as { issue_id?: string; time_entry?: { issue_id?: string } };
+      const issueId = issue_id ?? time_entry?.issue_id;
+      useTimerStore.getState().clearTimer();
+      if (wsId) {
+        qc.setQueryData(["timer", "active", wsId], null);
+        if (issueId) {
+          qc.invalidateQueries({ queryKey: timeEntryKeys.issueEntries(wsId, issueId) });
+        }
+      }
+    });
+
+    const unsubTimerDiscarded = ws.on("timer:discarded", () => {
+      const wsId = getCurrentWsId();
+      useTimerStore.getState().clearTimer();
+      if (wsId) {
+        qc.setQueryData(["timer", "active", wsId], null);
       }
     });
 
@@ -933,6 +959,8 @@ export function useRealtimeSync(
       unsubTimeEntryCreated();
       unsubTimeEntryDeleted();
       unsubTimeEntryUpdated();
+      unsubTimerStopped();
+      unsubTimerDiscarded();
       unsubWsDeleted();
       unsubMemberRemoved();
       unsubMemberAdded();

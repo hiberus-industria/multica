@@ -412,6 +412,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// Time entries
 					r.Get("/time-entries", h.ListTimeEntries)
 					r.Post("/time-entries", h.CreateTimeEntry)
+					// Timer (backend-owned)
+					r.Post("/timer/start", h.StartTimer)
 				})
 			})
 
@@ -420,6 +422,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			r.Put("/api/time-entries/{id}", h.UpdateTimeEntry)
 			r.Post("/api/time-entries/bulk-retry", h.BulkRetrySyncFailed)
 			r.Get("/api/time-tracking/dashboard", h.TimeTrackingDashboard)
+
+			// Active timer routes
+			r.Get("/api/timer", h.GetActiveTimer)
+			r.Post("/api/timer/stop", h.StopTimer)
+			r.Delete("/api/timer", h.DiscardTimer)
 
 			// Task messages (user-facing, not daemon auth)
 			r.Get("/api/tasks/{taskId}/messages", h.ListTaskMessagesByUser)

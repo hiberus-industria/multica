@@ -117,6 +117,8 @@ import type {
   CreateWorkCalendarRequest,
   UpdateWorkCalendarRequest,
   ListWorkCalendarsResponse,
+  ActiveTimerResponse,
+  StopTimerRequest,
 } from "../types";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import { type Logger, noopLogger } from "../logger";
@@ -2193,6 +2195,27 @@ export class ApiClient {
 
   async bulkRetrySyncFailed(): Promise<BulkRetryResponse> {
     return this.fetch("/api/time-entries/bulk-retry", { method: "POST" });
+  }
+
+  // ---- Active timer (backend-owned) ----
+
+  async getActiveTimer(): Promise<ActiveTimerResponse | null> {
+    return this.fetch("/api/timer");
+  }
+
+  async startTimer(issueId: string): Promise<ActiveTimerResponse> {
+    return this.fetch(`/api/issues/${issueId}/timer/start`, { method: "POST" });
+  }
+
+  async stopTimer(data?: StopTimerRequest): Promise<TimeEntry> {
+    return this.fetch("/api/timer/stop", {
+      method: "POST",
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  async discardTimer(): Promise<void> {
+    await this.fetch("/api/timer", { method: "DELETE" });
   }
 
   async getTimeTrackingDashboard(

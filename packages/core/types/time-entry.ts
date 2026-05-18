@@ -50,6 +50,19 @@ export interface UpdateTimeEntryRequest {
   spent_on?: string;
 }
 
+export interface ActiveTimerResponse {
+  issue_id: string;
+  issue_number: number;
+  issue_title: string;
+  started_at: string;
+}
+
+export interface StopTimerRequest {
+  comment?: string;
+  activity_name?: string;
+  redmine_activity_id?: number;
+}
+
 export interface BulkRetryResponse {
   retried: number;
   succeeded: number;

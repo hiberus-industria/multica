@@ -1728,7 +1728,6 @@ export function IssueDetail({
         wsId={wsId}
         issueId={id}
         issueIdentifier={issue.identifier}
-        issueTitle={issue.title}
       />
 
       {/* Redmine integration */}

@@ -140,7 +140,6 @@ export const ListRow = memo(function ListRow({
           <TimerPlayButton
             issueId={issue.id}
             issueIdentifier={issue.identifier}
-            issueTitle={issue.title}
             className="opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0"
           />
         </AppLink>

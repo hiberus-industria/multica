@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "@multica/ui/components/ui/popover";
 import { useTimerStore } from "@multica/core/time-entries/timer-store";
-import { useCreateTimeEntry } from "@multica/core/time-entries/mutations";
+import { useStopTimer, useDiscardTimer } from "@multica/core/time-entries/mutations";
 import { redmineActivitiesOptions } from "@multica/core/time-entries/queries";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useQuery } from "@tanstack/react-query";
@@ -37,8 +37,6 @@ function formatDurationShort(minutes: number): string {
 export function SidebarTimerIndicator() {
   const { t } = useT("time-tracking");
   const timer = useTimerStore((s) => s.activeTimer);
-  const stopTimer = useTimerStore((s) => s.stopTimer);
-  const discardTimer = useTimerStore((s) => s.discardTimer);
   const setActivity = useTimerStore((s) => s.setActivity);
 
   const [open, setOpen] = useState(false);
@@ -47,7 +45,8 @@ export function SidebarTimerIndicator() {
   const commentRef = useRef<HTMLInputElement>(null);
 
   const wsId = useWorkspaceId();
-  const createEntry = useCreateTimeEntry();
+  const stopTimer = useStopTimer();
+  const discardTimer = useDiscardTimer();
   const { data: activitiesData } = useQuery({
     ...redmineActivitiesOptions(wsId),
     enabled: !!wsId && !!timer,
@@ -75,31 +74,21 @@ export function SidebarTimerIndicator() {
   }, [open]);
 
   const handleStop = useCallback(() => {
-    const result = stopTimer();
-    if (!result) return;
-
     const activityId = timer?.activityId;
     const activityName = timer?.activityName;
 
-    createEntry.mutate(
+    stopTimer.mutate(
       {
-        issueId: result.issueId,
-        data: {
-          duration_minutes: result.durationMinutes,
-          redmine_activity_id: activityId,
-          activity_name: activityName,
-          comment: comment || undefined,
-          spent_on: new Date().toISOString().split("T")[0],
-          timer_started_at: result.startedAt,
-          timer_stopped_at: result.stoppedAt,
-        },
+        comment: comment || undefined,
+        redmine_activity_id: activityId,
+        activity_name: activityName,
       },
       {
         onSuccess: (entry) => {
           const syncLabel =
             entry.sync_status === "synced" ? " → synced to Redmine" : "";
           toast.success(
-            `Logged ${formatDurationShort(result.durationMinutes)}${syncLabel}`,
+            `Logged ${formatDurationShort(entry.duration_minutes)}${syncLabel}`,
           );
         },
         onError: () => {
@@ -110,10 +99,12 @@ export function SidebarTimerIndicator() {
 
     setComment("");
     setOpen(false);
-  }, [stopTimer, timer, comment, createEntry]);
+  }, [timer, comment, stopTimer]);
 
   const handleDiscard = useCallback(() => {
-    discardTimer();
+    discardTimer.mutate(undefined, {
+      onError: () => toast.error("Failed to discard timer"),
+    });
     setComment("");
     setOpen(false);
   }, [discardTimer]);
@@ -138,7 +129,7 @@ export function SidebarTimerIndicator() {
           {formatElapsed(elapsed)}
         </span>
         <span className="truncate font-medium text-foreground">
-          {timer.issueIdentifier}
+          HIB-{timer.issueNumber}
         </span>
       </PopoverTrigger>
 
@@ -200,7 +191,7 @@ export function SidebarTimerIndicator() {
             size="xs"
             className="flex-1"
             onClick={handleStop}
-            disabled={createEntry.isPending}
+            disabled={stopTimer.isPending}
           >
             <Square className="mr-1 size-3" />
             {t($ => $.timer_stop_log)}
@@ -210,3 +201,4 @@ export function SidebarTimerIndicator() {
     </Popover>
   );
 }
+
