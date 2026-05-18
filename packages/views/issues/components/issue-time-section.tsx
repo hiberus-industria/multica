@@ -7,7 +7,6 @@ import {
   Plus,
   Trash2,
   Pencil,
-  Loader2,
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
@@ -107,7 +106,8 @@ export function IssueTimeSection({
   const entries = data?.time_entries ?? [];
   const totalMinutes = data?.total_minutes ?? 0;
   // Use aggregated total across all Multica issues linked to the same Redmine task (when available).
-  const redmineTaskTotalMinutes = data?.redmine_task_total_minutes ?? totalMinutes;
+  const redmineTaskTotalMinutes =
+    data?.redmine_task_total_minutes ?? totalMinutes;
 
   const { data: activitiesData } = useQuery({
     ...redmineActivitiesOptions(wsId),
@@ -331,7 +331,10 @@ export function IssueTimeSection({
                   {formatMinutes(estimatedMinutes)}
                 </span>
                 <span>
-                  {Math.round((redmineTaskTotalMinutes / estimatedMinutes) * 100)}%
+                  {Math.round(
+                    (redmineTaskTotalMinutes / estimatedMinutes) * 100,
+                  )}
+                  %
                 </span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -352,7 +355,9 @@ export function IssueTimeSection({
               {redmineTaskTotalMinutes > estimatedMinutes && (
                 <p className="text-[10px] text-destructive">
                   {t(($) => $.ts_over_budget, {
-                    amount: formatMinutes(redmineTaskTotalMinutes - estimatedMinutes),
+                    amount: formatMinutes(
+                      redmineTaskTotalMinutes - estimatedMinutes,
+                    ),
                   })}
                 </p>
               )}
@@ -623,7 +628,10 @@ function TimeEntryRow({
       </span>
       <span className="shrink-0 whitespace-nowrap text-xs">
         <span className={syncTone}>{syncLabel}</span>
-        <span className="text-muted-foreground"> · {timeAgo(entry.created_at)}</span>
+        <span className="text-muted-foreground">
+          {" "}
+          · {timeAgo(entry.created_at)}
+        </span>
       </span>
       {isOwn && (
         <div
