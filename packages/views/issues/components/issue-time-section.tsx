@@ -3,15 +3,10 @@
 import { useState, useCallback, useMemo } from "react";
 import {
   ChevronRight,
-  Clock,
   Play,
   Plus,
   Trash2,
   Pencil,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  MinusCircle,
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
@@ -34,6 +29,15 @@ import { timeAgo } from "@multica/core/utils";
 import { toast } from "sonner";
 import { cn } from "@multica/ui/lib/utils";
 import { useT } from "../../i18n";
+import { ActorAvatar } from "../../common/actor-avatar";
+
+// Mask gradient that fades text into transparency at the right edge,
+// consistent with the Execution log section row pattern.
+const ENTRY_MASK_STYLE: React.CSSProperties = {
+  maskImage: "linear-gradient(to right, black calc(100% - 12px), transparent)",
+  WebkitMaskImage:
+    "linear-gradient(to right, black calc(100% - 12px), transparent)",
+};
 
 // Smart duration parser: "2h", "30m", "1h30m", "1.5h", "90m", "1:30"
 function parseDuration(input: string): number | null {
@@ -70,32 +74,6 @@ function formatMinutes(minutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-const SYNC_ICONS: Record<
-  string,
-  { icon: typeof CheckCircle; className: string; title: string }
-> = {
-  synced: {
-    icon: CheckCircle,
-    className: "text-emerald-500",
-    title: "Synced to Redmine",
-  },
-  pending: {
-    icon: Loader2,
-    className: "text-muted-foreground animate-spin",
-    title: "Syncing...",
-  },
-  failed: {
-    icon: AlertCircle,
-    className: "text-destructive",
-    title: "Sync failed",
-  },
-  not_linked: {
-    icon: MinusCircle,
-    className: "text-muted-foreground",
-    title: "Issue not linked to Redmine",
-  },
-};
-
 interface IssueTimeSectionProps {
   wsId: string;
   issueId: string;
@@ -110,6 +88,7 @@ export function IssueTimeSection({
   issueTitle,
 }: IssueTimeSectionProps) {
   const [open, setOpen] = useState(true);
+  const [showEntries, setShowEntries] = useState(true);
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const [duration, setDuration] = useState("");
   const [logComment, setLogComment] = useState("");
@@ -127,7 +106,8 @@ export function IssueTimeSection({
   const entries = data?.time_entries ?? [];
   const totalMinutes = data?.total_minutes ?? 0;
   // Use aggregated total across all Multica issues linked to the same Redmine task (when available).
-  const redmineTaskTotalMinutes = data?.redmine_task_total_minutes ?? totalMinutes;
+  const redmineTaskTotalMinutes =
+    data?.redmine_task_total_minutes ?? totalMinutes;
 
   const { data: activitiesData } = useQuery({
     ...redmineActivitiesOptions(wsId),
@@ -306,13 +286,7 @@ export function IssueTimeSection({
         )}
         onClick={() => setOpen(!open)}
       >
-        <Clock className="size-3 shrink-0 text-muted-foreground" />
         {t(($) => $.ts_header)}
-        {totalMinutes > 0 && (
-          <span className="ml-auto text-[10px] font-normal text-muted-foreground tabular-nums">
-            {formatMinutes(totalMinutes)}
-          </span>
-        )}
         <ChevronRight
           className={cn(
             "!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform",
@@ -357,7 +331,10 @@ export function IssueTimeSection({
                   {formatMinutes(estimatedMinutes)}
                 </span>
                 <span>
-                  {Math.round((redmineTaskTotalMinutes / estimatedMinutes) * 100)}%
+                  {Math.round(
+                    (redmineTaskTotalMinutes / estimatedMinutes) * 100,
+                  )}
+                  %
                 </span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -378,7 +355,9 @@ export function IssueTimeSection({
               {redmineTaskTotalMinutes > estimatedMinutes && (
                 <p className="text-[10px] text-destructive">
                   {t(($) => $.ts_over_budget, {
-                    amount: formatMinutes(redmineTaskTotalMinutes - estimatedMinutes),
+                    amount: formatMinutes(
+                      redmineTaskTotalMinutes - estimatedMinutes,
+                    ),
                   })}
                 </p>
               )}
@@ -467,150 +446,218 @@ export function IssueTimeSection({
             </Button>
           )}
 
-          {/* Entries list */}
+          {/* Entries collapsible (mirrors Execution log "Hide past runs" pattern) */}
           {entries.length > 0 && (
-            <div className="space-y-0.5">
-              {entries.map((entry) => {
-                const sync =
-                  SYNC_ICONS[entry.sync_status] ?? SYNC_ICONS.not_linked!;
-                const SyncIcon = sync.icon;
-                const isOwn = entry.user_id === currentUser?.id;
-                const isEditing = editingId === entry.id;
+            <>
+              <button
+                type="button"
+                onClick={() => setShowEntries(!showEntries)}
+                className="flex w-full items-center gap-1 rounded px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+              >
+                <ChevronRight
+                  className={cn(
+                    "!size-3 shrink-0 stroke-[2.5] transition-transform",
+                    showEntries && "rotate-90",
+                  )}
+                />
+                {showEntries
+                  ? t(($) => $.ts_hide_entries, { count: entries.length })
+                  : t(($) => $.ts_show_entries, { count: entries.length })}
+                {totalMinutes > 0 && (
+                  <span className="ml-auto text-[10px] font-normal tabular-nums">
+                    {formatMinutes(totalMinutes)}
+                  </span>
+                )}
+              </button>
 
-                if (isEditing) {
-                  return (
-                    <div
-                      key={entry.id}
-                      className="animate-in fade-in-0 duration-150 space-y-1.5 rounded-md border bg-muted/30 p-2 -mx-2"
-                    >
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          placeholder="Duration"
-                          className="flex-1 rounded-md border bg-background px-2 py-1 text-[11px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                          value={editDuration}
-                          onChange={(e) => setEditDuration(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleSaveEdit();
-                            if (e.key === "Escape") setEditingId(null);
-                          }}
-                          autoFocus
-                        />
-                        <input
-                          type="date"
-                          className="w-28 rounded-md border bg-background px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
-                          value={editDate}
-                          onChange={(e) => setEditDate(e.target.value)}
-                        />
-                      </div>
-                      {activities.length > 0 && (
-                        <select
-                          className="w-full rounded-md border bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
-                          value={editActivityId ?? ""}
-                          onChange={(e) =>
-                            setEditActivityId(
-                              e.target.value
-                                ? Number(e.target.value)
-                                : undefined,
-                            )
-                          }
+              {showEntries && (
+                <div className="mt-0.5 space-y-0.5">
+                  {entries.map((entry) => {
+                    const isOwn = entry.user_id === currentUser?.id;
+                    const isEditing = editingId === entry.id;
+
+                    if (isEditing) {
+                      return (
+                        <div
+                          key={entry.id}
+                          className="animate-in fade-in-0 duration-150 space-y-1.5 rounded-md border bg-muted/30 p-2"
                         >
-                          <option value="">Activity type...</option>
-                          {activities.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      <input
-                        type="text"
-                        placeholder="Comment (optional)"
-                        className="w-full rounded-md border bg-background px-2 py-1 text-[11px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                        value={editComment}
-                        onChange={(e) => setEditComment(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSaveEdit();
-                          if (e.key === "Escape") setEditingId(null);
-                        }}
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              placeholder="Duration"
+                              className="flex-1 rounded-md border bg-background px-2 py-1 text-[11px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                              value={editDuration}
+                              onChange={(e) => setEditDuration(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveEdit();
+                                if (e.key === "Escape") setEditingId(null);
+                              }}
+                              autoFocus
+                            />
+                            <input
+                              type="date"
+                              className="w-28 rounded-md border bg-background px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                              value={editDate}
+                              onChange={(e) => setEditDate(e.target.value)}
+                            />
+                          </div>
+                          {activities.length > 0 && (
+                            <select
+                              className="w-full rounded-md border bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-ring"
+                              value={editActivityId ?? ""}
+                              onChange={(e) =>
+                                setEditActivityId(
+                                  e.target.value
+                                    ? Number(e.target.value)
+                                    : undefined,
+                                )
+                              }
+                            >
+                              <option value="">Activity type...</option>
+                              {activities.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <input
+                            type="text"
+                            placeholder="Comment (optional)"
+                            className="w-full rounded-md border bg-background px-2 py-1 text-[11px] placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            value={editComment}
+                            onChange={(e) => setEditComment(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveEdit();
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                          />
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              className="text-[11px]"
+                              onClick={() => setEditingId(null)}
+                            >
+                              {t(($) => $.ts_cancel)}
+                            </Button>
+                            <Button
+                              size="xs"
+                              className="text-[11px]"
+                              onClick={handleSaveEdit}
+                              disabled={updateEntry.isPending}
+                            >
+                              {t(($) => $.ts_save)}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <TimeEntryRow
+                        key={entry.id}
+                        entry={entry}
+                        isOwn={isOwn}
+                        onEdit={handleStartEdit}
+                        onDelete={handleDelete}
                       />
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          className="text-[11px]"
-                          onClick={() => setEditingId(null)}
-                        >
-                          {t(($) => $.ts_cancel)}
-                        </Button>
-                        <Button
-                          size="xs"
-                          className="text-[11px]"
-                          onClick={handleSaveEdit}
-                          disabled={updateEntry.isPending}
-                        >
-                          {t(($) => $.ts_save)}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={entry.id}
-                    className="group flex items-center gap-1.5 rounded-md px-2 py-1 -mx-2 hover:bg-accent/50 transition-colors text-[11px]"
-                  >
-                    <span className="font-medium tabular-nums shrink-0">
-                      {formatMinutes(entry.duration_minutes)}
-                    </span>
-                    {entry.activity_name && (
-                      <>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="text-muted-foreground truncate">
-                          {entry.activity_name}
-                        </span>
-                      </>
-                    )}
-                    {entry.comment && (
-                      <>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="text-muted-foreground truncate italic">
-                          &quot;{entry.comment}&quot;
-                        </span>
-                      </>
-                    )}
-                    <span className="ml-auto flex items-center gap-1 shrink-0">
-                      <span title={sync.title}>
-                        <SyncIcon className={cn("size-3", sync.className)} />
-                      </span>
-                      <span className="text-muted-foreground text-[10px]">
-                        {timeAgo(entry.created_at)}
-                      </span>
-                      {isOwn && (
-                        <>
-                          <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                            onClick={() => handleStartEdit(entry)}
-                            title="Edit"
-                          >
-                            <Pencil className="size-3" />
-                          </button>
-                          <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDelete(entry)}
-                            title="Delete"
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
-                        </>
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sync status visual config ─────────────────────────────────────────────
+
+const SYNC_TONE: Record<string, string> = {
+  synced: "text-emerald-500",
+  pending: "text-muted-foreground",
+  failed: "text-destructive",
+  not_linked: "text-muted-foreground",
+};
+
+const SYNC_LABEL: Record<string, string> = {
+  synced: "Synced",
+  pending: "Syncing…",
+  failed: "Sync failed",
+  not_linked: "Not linked",
+};
+
+// ─── Time entry row ─────────────────────────────────────────────────────────
+
+// Mirrors the RowShell / TriggerText / RowActions pattern from
+// execution-log-section.tsx for visual consistency.
+function TimeEntryRow({
+  entry,
+  isOwn,
+  onEdit,
+  onDelete,
+}: {
+  entry: TimeEntry;
+  isOwn: boolean;
+  onEdit: (entry: TimeEntry) => void;
+  onDelete: (entry: TimeEntry) => void;
+}) {
+  const syncTone = SYNC_TONE[entry.sync_status] ?? SYNC_TONE.not_linked!;
+  const syncLabel = SYNC_LABEL[entry.sync_status] ?? SYNC_LABEL.not_linked!;
+
+  const description = [
+    formatMinutes(entry.duration_minutes),
+    entry.activity_name,
+    entry.comment ? `"${entry.comment}"` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="group relative flex items-center gap-2 rounded px-1 py-1.5 transition-colors hover:bg-accent/40">
+      <ActorAvatar actorType="member" actorId={entry.user_id} size={20} />
+      <span
+        className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-xs text-muted-foreground"
+        style={ENTRY_MASK_STYLE}
+      >
+        {description}
+      </span>
+      <span className="shrink-0 whitespace-nowrap text-xs">
+        <span className={syncTone}>{syncLabel}</span>
+        <span className="text-muted-foreground">
+          {" "}
+          · {timeAgo(entry.created_at)}
+        </span>
+      </span>
+      {isOwn && (
+        <div
+          className={[
+            "pointer-events-none absolute inset-y-0 right-1 flex items-center gap-0.5 pl-6 opacity-0 transition-opacity",
+            "bg-gradient-to-l from-accent/95 via-accent/80 to-transparent",
+            "group-hover:pointer-events-auto group-hover:opacity-100",
+            "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+          ].join(" ")}
+        >
+          <button
+            type="button"
+            className="flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+            onClick={() => onEdit(entry)}
+            title="Edit"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className="flex items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => onDelete(entry)}
+            title="Delete"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
     </div>

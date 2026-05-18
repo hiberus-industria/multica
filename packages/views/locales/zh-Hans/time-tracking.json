@@ -73,5 +73,9 @@
   "ts_log_time": "记录时间",
   "ts_retry_failed_other": "重试 {{count}} 条失败记录",
   "ts_cancel": "取消",
-  "ts_save": "保存"
+  "ts_save": "保存",
+  "ts_show_entries_one": "显示时间记录 ({{count}})",
+  "ts_show_entries_other": "显示时间记录 ({{count}})",
+  "ts_hide_entries_one": "隐藏时间记录 ({{count}})",
+  "ts_hide_entries_other": "隐藏时间记录 ({{count}})"
 }
