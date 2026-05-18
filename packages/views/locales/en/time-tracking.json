@@ -78,5 +78,9 @@
   "ts_retry_failed_one": "Retry {{count}} failed entry",
   "ts_retry_failed_other": "Retry {{count}} failed entries",
   "ts_cancel": "Cancel",
-  "ts_save": "Save"
+  "ts_save": "Save",
+  "ts_show_entries_one": "Show time entries ({{count}})",
+  "ts_show_entries_other": "Show time entries ({{count}})",
+  "ts_hide_entries_one": "Hide time entries ({{count}})",
+  "ts_hide_entries_other": "Hide time entries ({{count}})"
 }

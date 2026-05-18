@@ -78,5 +78,9 @@
   "ts_retry_failed_one": "Reintentar {{count}} entrada fallida",
   "ts_retry_failed_other": "Reintentar {{count}} entradas fallidas",
   "ts_cancel": "Cancelar",
-  "ts_save": "Guardar"
+  "ts_save": "Guardar",
+  "ts_show_entries_one": "Mostrar entradas de tiempo ({{count}})",
+  "ts_show_entries_other": "Mostrar entradas de tiempo ({{count}})",
+  "ts_hide_entries_one": "Ocultar entradas de tiempo ({{count}})",
+  "ts_hide_entries_other": "Ocultar entradas de tiempo ({{count}})"
 }
