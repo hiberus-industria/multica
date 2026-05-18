@@ -367,10 +367,11 @@ vi.mock("@multica/core/realtime", () => ({
   useRealtimeSync: () => {},
 }));
 
-// Mock sonner
-vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
-}));
+// Mock sonner — toast is callable as a function AND has .error/.success sub-methods
+vi.mock("sonner", () => {
+  const toastFn = Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() });
+  return { toast: toastFn };
+});
 
 // Mock react-resizable-panels (used by @multica/ui/components/ui/resizable)
 vi.mock("react-resizable-panels", () => ({

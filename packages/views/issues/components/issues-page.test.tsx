@@ -280,10 +280,11 @@ vi.mock("@multica/core/modals", () => ({
   ),
 }));
 
-// Mock sonner toast
-vi.mock("sonner", () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
-}));
+// Mock sonner toast — toast is callable as a function AND has .error/.success sub-methods
+vi.mock("sonner", () => {
+  const toastFn = Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() });
+  return { toast: toastFn };
+});
 
 // Mock dnd-kit
 vi.mock("@dnd-kit/core", () => ({
