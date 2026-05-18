@@ -47,13 +47,16 @@
     "no_results": "Sin resultados"
   },
   "code_block": {
-    "copy_code": "Copiar código"
+    "copy_code": "Copiar código",
+    "show_preview": "Mostrar vista previa",
+    "show_source": "Mostrar código fuente"
   },
   "file_card": {
     "uploading": "Subiendo {{filename}}"
   },
   "attachment": {
     "download_failed": "No se pudo obtener el enlace de descarga. Inténtalo de nuevo en un momento.",
+    "open_in_new_tab": "Abrir en nueva pestaña",
     "preview": "Vista previa",
     "preview_loading": "Cargando vista previa…",
     "preview_failed": "No se pudo cargar la vista previa",
