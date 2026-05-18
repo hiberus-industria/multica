@@ -234,7 +234,18 @@
     "skill_description_label": "Descripción",
     "skill_description_placeholder": "Opcional — describe cuándo un agente debe usar esta habilidad.",
     "toast_imported": "Habilidad importada",
-    "toast_import_failed": "Error al importar la habilidad"
+    "toast_import_failed": "Error al importar la habilidad",
+    "select_all": "Seleccionar todo ({{count}})",
+    "bulk_ready": "{{count}} habilidades seleccionadas",
+    "bulk_import_button": "Importar {{count}} habilidades",
+    "bulk_progress": "Importando {{completed}} / {{total}}…",
+    "bulk_cancel_button": "Cancelar",
+    "bulk_complete_hint": "Importación completada.",
+    "bulk_cancelled_hint": "Importación cancelada.",
+    "bulk_done_button": "Listo",
+    "bulk_summary_imported": "Importadas",
+    "bulk_summary_skipped": "Omitidas",
+    "bulk_summary_failed": "Fallidas"
   },
   "file_tree": {
     "no_files": "Sin archivos"

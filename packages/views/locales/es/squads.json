@@ -41,7 +41,14 @@
     "create_agent_button": "Crear agente",
     "view_agent_tooltip": "Abrir detalle del agente",
     "make_leader_tooltip": "Convertir en líder del equipo",
-    "remove_member_tooltip": "Eliminar del equipo"
+    "remove_member_tooltip": "Eliminar del equipo",
+    "status_working": "Trabajando",
+    "status_idle": "Inactivo",
+    "status_offline": "Desconectado",
+    "status_unstable": "Inestable",
+    "issue_status_blocked": "bloqueado",
+    "active_issue_more": "y {{count}} más",
+    "last_active_label": "activo por última vez {{time}}"
   },
   "instructions_tab": {
     "description": "Las instrucciones del equipo se inyectan en el prompt del agente líder cada vez que trabaja en una tarea asignada a este equipo. Úsalas para dar al líder orientaciones generales del equipo, acuerdos de trabajo o contexto que debe seguir en cada tarea.",
