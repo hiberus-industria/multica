@@ -129,7 +129,7 @@ export function SidebarTimerIndicator() {
           {formatElapsed(elapsed)}
         </span>
         <span className="truncate font-medium text-foreground">
-          HIB-{timer.issueNumber}
+          {timer.issueIdentifier}
         </span>
       </PopoverTrigger>
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
@@ -19,10 +20,11 @@ import (
 // ---- Response types ----
 
 type ActiveTimerResponse struct {
-	IssueID     string `json:"issue_id"`
-	IssueNumber int32  `json:"issue_number"`
-	IssueTitle  string `json:"issue_title"`
-	StartedAt   string `json:"started_at"`
+	IssueID         string `json:"issue_id"`
+	IssueNumber     int32  `json:"issue_number"`
+	IssueIdentifier string `json:"issue_identifier"`
+	IssueTitle      string `json:"issue_title"`
+	StartedAt       string `json:"started_at"`
 }
 
 // ---- Handlers ----
@@ -58,10 +60,11 @@ func (h *Handler) GetActiveTimer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, ActiveTimerResponse{
-		IssueID:     uuidToString(timer.IssueID),
-		IssueNumber: issue.Number,
-		IssueTitle:  issue.Title,
-		StartedAt:   timestampToString(timer.StartedAt),
+		IssueID:         uuidToString(timer.IssueID),
+		IssueNumber:     issue.Number,
+		IssueIdentifier: fmt.Sprintf("%s-%d", h.getIssuePrefix(r.Context(), issue.WorkspaceID), issue.Number),
+		IssueTitle:      issue.Title,
+		StartedAt:       timestampToString(timer.StartedAt),
 	})
 }
 
@@ -105,10 +108,11 @@ func (h *Handler) StartTimer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ActiveTimerResponse{
-		IssueID:     uuidToString(timer.IssueID),
-		IssueNumber: issue.Number,
-		IssueTitle:  issue.Title,
-		StartedAt:   timestampToString(timer.StartedAt),
+		IssueID:         uuidToString(timer.IssueID),
+		IssueNumber:     issue.Number,
+		IssueIdentifier: fmt.Sprintf("%s-%d", h.getIssuePrefix(r.Context(), issue.WorkspaceID), issue.Number),
+		IssueTitle:      issue.Title,
+		StartedAt:       timestampToString(timer.StartedAt),
 	}
 
 	h.publish(protocol.EventTimerStarted, workspaceID, "member", userID, map[string]any{

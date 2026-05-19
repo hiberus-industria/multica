@@ -122,7 +122,7 @@ export function IdleDetector() {
         <p className="mb-4 text-xs text-muted-foreground">
           {t($ => $.idle_body, {
             duration: formatDuration(idleDuration),
-            issue: `HIB-${timer.issueNumber}`,
+            issue: timer.issueIdentifier,
           })}
         </p>
         <div className="flex flex-col gap-2">
