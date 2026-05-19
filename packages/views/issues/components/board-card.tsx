@@ -119,7 +119,6 @@ export const BoardCardContent = memo(function BoardCardContent({
         <TimerPlayButton
           issueId={issue.id}
           issueIdentifier={issue.identifier}
-          issueTitle={issue.title}
         />
       </div>
       {/* Row 1: Identifier */}

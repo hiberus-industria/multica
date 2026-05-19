@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Square, X, Clock, ChevronUp } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
 import { useTimerStore } from "@multica/core/time-entries/timer-store";
-import { useCreateTimeEntry } from "@multica/core/time-entries/mutations";
+import { useStopTimer, useDiscardTimer } from "@multica/core/time-entries/mutations";
 import { redmineActivitiesOptions } from "@multica/core/time-entries/queries";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useQuery } from "@tanstack/react-query";
@@ -26,8 +26,6 @@ function formatElapsed(ms: number): string {
 export function FloatingTimer() {
   const { t } = useT("time-tracking");
   const timer = useTimerStore((s) => s.activeTimer);
-  const stopTimer = useTimerStore((s) => s.stopTimer);
-  const discardTimer = useTimerStore((s) => s.discardTimer);
   const setActivity = useTimerStore((s) => s.setActivity);
 
   const [expanded, setExpanded] = useState(false);
@@ -36,7 +34,8 @@ export function FloatingTimer() {
   const commentRef = useRef<HTMLInputElement>(null);
 
   const wsId = useWorkspaceId();
-  const createEntry = useCreateTimeEntry();
+  const stopTimer = useStopTimer();
+  const discardTimer = useDiscardTimer();
   const { data: activitiesData } = useQuery({
     ...redmineActivitiesOptions(wsId),
     enabled: !!wsId && !!timer,
@@ -66,31 +65,22 @@ export function FloatingTimer() {
   }, [expanded]);
 
   const handleStop = useCallback(() => {
-    const result = stopTimer();
-    if (!result) return;
-
     const activityId = timer?.activityId;
     const activityName = timer?.activityName;
 
-    createEntry.mutate(
+    stopTimer.mutate(
       {
-        issueId: result.issueId,
-        data: {
-          duration_minutes: result.durationMinutes,
-          redmine_activity_id: activityId,
-          activity_name: activityName,
-          comment: comment || undefined,
-          spent_on: new Date().toISOString().split("T")[0],
-          timer_started_at: result.startedAt,
-          timer_stopped_at: result.stoppedAt,
-        },
+        comment: comment || undefined,
+        redmine_activity_id: activityId,
+        activity_name: activityName,
       },
       {
         onSuccess: (entry) => {
+          const durationMinutes = entry.duration_minutes;
           const syncLabel =
             entry.sync_status === "synced" ? " → synced to Redmine" : "";
           toast.success(
-            `Logged ${formatDurationShort(result.durationMinutes)}${syncLabel}`,
+            `Logged ${formatDurationShort(durationMinutes)}${syncLabel}`,
           );
         },
         onError: () => {
@@ -101,10 +91,12 @@ export function FloatingTimer() {
 
     setComment("");
     setExpanded(false);
-  }, [stopTimer, timer, comment, createEntry]);
+  }, [timer, comment, stopTimer]);
 
   const handleDiscard = useCallback(() => {
-    discardTimer();
+    discardTimer.mutate(undefined, {
+      onError: () => toast.error("Failed to discard timer"),
+    });
     setComment("");
     setExpanded(false);
   }, [discardTimer]);
@@ -182,7 +174,7 @@ export function FloatingTimer() {
               size="xs"
               className="flex-1"
               onClick={handleStop}
-              disabled={createEntry.isPending}
+              disabled={stopTimer.isPending}
             >
               <Square className="size-3 mr-1" />
               {t($ => $.timer_stop_log)}
@@ -208,7 +200,7 @@ export function FloatingTimer() {
 
         {/* Issue identifier */}
         <span className="text-xs font-medium text-foreground">
-          {timer.issueIdentifier}
+          HIB-{timer.issueNumber}
         </span>
 
         {/* Elapsed time — monospace for stable width */}
@@ -234,3 +226,4 @@ function formatDurationShort(minutes: number): string {
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
+

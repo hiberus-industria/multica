@@ -8,6 +8,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ActiveTimer struct {
+	ID          pgtype.UUID        `json:"id"`
+	WorkspaceID pgtype.UUID        `json:"workspace_id"`
+	IssueID     pgtype.UUID        `json:"issue_id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type ActivityLog struct {
 	ID          pgtype.UUID        `json:"id"`
 	WorkspaceID pgtype.UUID        `json:"workspace_id"`

@@ -129,4 +129,9 @@ const (
 	EventTimeEntryCreated = "time_entry:created"
 	EventTimeEntryUpdated = "time_entry:updated"
 	EventTimeEntryDeleted = "time_entry:deleted"
+
+	// Active timer events
+	EventTimerStarted   = "timer:started"
+	EventTimerStopped   = "timer:stopped"
+	EventTimerDiscarded = "timer:discarded"
 )

@@ -21,6 +21,7 @@ import {
   useDeleteTimeEntry,
   useUpdateTimeEntry,
   useBulkRetrySyncFailed,
+  useStartTimer,
 } from "@multica/core/time-entries/mutations";
 import { useTimerStore } from "@multica/core/time-entries/timer-store";
 import { useAuthStore } from "@multica/core/auth";
@@ -78,14 +79,12 @@ interface IssueTimeSectionProps {
   wsId: string;
   issueId: string;
   issueIdentifier: string;
-  issueTitle: string;
 }
 
 export function IssueTimeSection({
   wsId,
   issueId,
   issueIdentifier,
-  issueTitle,
 }: IssueTimeSectionProps) {
   const [open, setOpen] = useState(true);
   const [showEntries, setShowEntries] = useState(true);
@@ -99,7 +98,7 @@ export function IssueTimeSection({
 
   const currentUser = useAuthStore((s) => s.user);
   const activeTimer = useTimerStore((s) => s.activeTimer);
-  const startTimer = useTimerStore((s) => s.startTimer);
+  const startTimerMutation = useStartTimer();
   const { t } = useT("time-tracking");
 
   const { data } = useQuery(issueTimeEntriesOptions(wsId, issueId));
@@ -145,22 +144,22 @@ export function IssueTimeSection({
   const handleStartTimer = useCallback(() => {
     if (isTimerOnThisIssue) return;
     if (isTimerRunning) {
-      // Another issue's timer is running — for now just warn
       toast.info(
-        `Timer already running on ${activeTimer!.issueIdentifier}. Stop it first.`,
+        `Timer already running on HIB-${activeTimer!.issueNumber}. Stop it first.`,
       );
       return;
     }
-    startTimer(issueId, issueIdentifier, issueTitle);
-    toast.success(`Timer started for ${issueIdentifier}`);
+    startTimerMutation.mutate(
+      issueId,
+      { onSuccess: () => toast.success(`Timer started for ${issueIdentifier}`) },
+    );
   }, [
     issueId,
     issueIdentifier,
-    issueTitle,
     isTimerOnThisIssue,
     isTimerRunning,
     activeTimer,
-    startTimer,
+    startTimerMutation,
   ]);
 
   const handleQuickLog = useCallback(() => {

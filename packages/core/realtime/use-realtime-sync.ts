@@ -40,6 +40,7 @@ import type { Workspace } from "../types/workspace";
 import { chatKeys } from "../chat/queries";
 import { useChatStore } from "../chat";
 import { timeEntryKeys } from "../time-entries/queries";
+import { useTimerStore } from "../time-entries/timer-store";
 import { resolvePostAuthDestination, useHasOnboarded } from "../paths";
 import type {
   MemberAddedPayload,
@@ -73,6 +74,7 @@ import type {
   ChatMessage,
   ChatPendingTask,
   InvitationCreatedPayload,
+  ActiveTimerResponse,
 } from "../types";
 
 const chatWsLogger = createLogger("chat.ws");
@@ -372,6 +374,9 @@ export function useRealtimeSync(
       "time_entry:created",
       "time_entry:updated",
       "time_entry:deleted",
+      "timer:started",
+      "timer:stopped",
+      "timer:discarded",
       // Chat events are handled explicitly below; do not double-invalidate.
       "chat:message",
       "chat:done",
@@ -616,6 +621,45 @@ export function useRealtimeSync(
         qc.invalidateQueries({
           queryKey: timeEntryKeys.issueEntries(wsId, issue_id),
         });
+      }
+    });
+
+    // --- Timer events ---
+
+    const unsubTimerStarted = ws.on("timer:started", (p) => {
+      const wsId = getCurrentWsId();
+      const { timer } = p as { timer?: ActiveTimerResponse };
+      if (timer) {
+        useTimerStore.getState().setTimerFromResponse(timer);
+        if (wsId) {
+          qc.setQueryData(["timer", "active", wsId], timer);
+        }
+      }
+    });
+
+    const unsubTimerStopped = ws.on("timer:stopped", (p) => {
+      const wsId = getCurrentWsId();
+      const { issue_id, time_entry } = p as {
+        issue_id?: string;
+        time_entry?: { issue_id?: string };
+      };
+      const issueId = issue_id ?? time_entry?.issue_id;
+      useTimerStore.getState().clearTimer();
+      if (wsId) {
+        qc.setQueryData(["timer", "active", wsId], null);
+        if (issueId) {
+          qc.invalidateQueries({
+            queryKey: timeEntryKeys.issueEntries(wsId, issueId),
+          });
+        }
+      }
+    });
+
+    const unsubTimerDiscarded = ws.on("timer:discarded", () => {
+      const wsId = getCurrentWsId();
+      useTimerStore.getState().clearTimer();
+      if (wsId) {
+        qc.setQueryData(["timer", "active", wsId], null);
       }
     });
 
@@ -977,6 +1021,9 @@ export function useRealtimeSync(
       unsubTimeEntryCreated();
       unsubTimeEntryDeleted();
       unsubTimeEntryUpdated();
+      unsubTimerStarted();
+      unsubTimerStopped();
+      unsubTimerDiscarded();
       unsubMemberRemoved();
       unsubMemberAdded();
       unsubInvitationCreated();

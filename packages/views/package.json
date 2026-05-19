@@ -49,6 +49,7 @@
     "./attachments": "./attachments/index.ts",
     "./locales": "./locales/index.ts",
     "./locales/*": "./locales/*",
+    "./time-tracking/active-timer-init": "./time-tracking/active-timer-init.tsx",
     "./time-tracking/timer-play-button": "./time-tracking/timer-play-button.tsx",
     "./time-tracking/sidebar-timer-indicator": "./time-tracking/sidebar-timer-indicator.tsx",
     "./time-tracking/idle-detector": "./time-tracking/idle-detector.tsx",

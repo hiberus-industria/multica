@@ -2238,6 +2238,11 @@ func (h *Handler) UpdateIssue(w http.ResponseWriter, r *http.Request) {
 		h.TaskService.CancelTasksForIssue(r.Context(), issue.ID)
 	}
 
+	// Stop active timers when the issue reaches a final state.
+	if statusChanged && (issue.Status == "done" || issue.Status == "cancelled") {
+		h.StopTimersForIssue(r.Context(), workspaceID, issue.ID)
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -2648,6 +2653,11 @@ func (h *Handler) BatchUpdateIssues(w http.ResponseWriter, r *http.Request) {
 		// Cancel active tasks when the issue is cancelled by a user.
 		if statusChanged && issue.Status == "cancelled" {
 			h.TaskService.CancelTasksForIssue(r.Context(), issue.ID)
+		}
+
+		// Stop active timers when the issue reaches a final state.
+		if statusChanged && (issue.Status == "done" || issue.Status == "cancelled") {
+			h.StopTimersForIssue(r.Context(), workspaceID, issue.ID)
 		}
 
 		updated++

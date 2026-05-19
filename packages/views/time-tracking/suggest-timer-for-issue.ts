@@ -1,6 +1,7 @@
 "use client";
 
 import type { Issue } from "@multica/core/types";
+import { api } from "@multica/core/api";
 import { useTimerStore } from "@multica/core/time-entries/timer-store";
 import { toast } from "sonner";
 
@@ -19,10 +20,12 @@ export function suggestTimerForIssue(issue: Issue) {
       label: "Start timer",
       onClick: () => {
         if (useTimerStore.getState().activeTimer) return;
-        useTimerStore
-          .getState()
-          .startTimer(issue.id, issue.identifier, issue.title);
-        toast.success(`Timer started for ${issue.identifier}`);
+        api.startTimer(issue.id).then((resp) => {
+          useTimerStore.getState().setTimerFromResponse(resp);
+          toast.success(`Timer started for ${issue.identifier}`);
+        }).catch(() => {
+          toast.error("Failed to start timer");
+        });
       },
     },
     duration: 8000,

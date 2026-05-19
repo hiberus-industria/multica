@@ -182,6 +182,8 @@ export type {
   BulkRetryResponse,
   DashboardEntry,
   DashboardResponse,
+  ActiveTimerResponse,
+  StopTimerRequest,
 } from "./time-entry";
 export type {
   CalendarDay,
