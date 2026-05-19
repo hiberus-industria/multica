@@ -15,6 +15,11 @@
     "tasks_label": "Tareas · {{days}}D",
     "tasks_hint": "{{failed}} fallidas"
   },
+  "dim": {
+    "label": "Dimensión",
+    "daily": "Diario",
+    "weekly": "Semanal"
+  },
   "daily": {
     "no_data": "Sin uso en este período.",
     "title_cost": "Coste diario",
@@ -25,6 +30,13 @@
     "metric_tokens": "Tokens",
     "metric_time": "Tiempo",
     "metric_tasks": "Tareas"
+  },
+  "weekly": {
+    "title_cost": "Coste semanal",
+    "title_tokens": "Tokens semanales",
+    "title_time": "Tiempo de ejecución semanal",
+    "title_tasks": "Tareas semanales",
+    "partial_label": "{{range}} (parcial · {{covered}} / 7 días)"
   },
   "leaderboard": {
     "title": "Clasificación",
