@@ -31,7 +31,7 @@ export function TimerPlayButton({
       e.stopPropagation();
       if (isOtherRunning) {
         toast.info(
-          `Timer running on HIB-${activeTimer!.issueNumber}. Stop it first.`,
+          `Timer running on ${activeTimer!.issueIdentifier}. Stop it first.`,
         );
         return;
       }

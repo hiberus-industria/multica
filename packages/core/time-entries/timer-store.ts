@@ -4,6 +4,7 @@ import type { ActiveTimerResponse } from "../types";
 export interface ActiveTimer {
   issueId: string;
   issueNumber: number;
+  issueIdentifier: string;
   issueTitle: string;
   startedAt: number; // epoch ms — elapsed computed from Date.now() - startedAt
   activityId?: number;
@@ -27,6 +28,7 @@ export const useTimerStore = create<TimerState>()((set, get) => ({
       activeTimer: {
         issueId: resp.issue_id,
         issueNumber: resp.issue_number,
+        issueIdentifier: resp.issue_identifier,
         issueTitle: resp.issue_title,
         startedAt: new Date(resp.started_at).getTime(),
         // Preserve locally-selected activity if the same issue timer is running.

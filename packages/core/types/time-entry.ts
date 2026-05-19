@@ -53,6 +53,7 @@ export interface UpdateTimeEntryRequest {
 export interface ActiveTimerResponse {
   issue_id: string;
   issue_number: number;
+  issue_identifier: string;
   issue_title: string;
   started_at: string;
 }

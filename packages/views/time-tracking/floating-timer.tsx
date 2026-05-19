@@ -200,7 +200,7 @@ export function FloatingTimer() {
 
         {/* Issue identifier */}
         <span className="text-xs font-medium text-foreground">
-          HIB-{timer.issueNumber}
+          {timer.issueIdentifier}
         </span>
 
         {/* Elapsed time — monospace for stable width */}

@@ -145,7 +145,7 @@ export function IssueTimeSection({
     if (isTimerOnThisIssue) return;
     if (isTimerRunning) {
       toast.info(
-        `Timer already running on HIB-${activeTimer!.issueNumber}. Stop it first.`,
+        `Timer already running on ${activeTimer!.issueIdentifier}. Stop it first.`,
       );
       return;
     }
