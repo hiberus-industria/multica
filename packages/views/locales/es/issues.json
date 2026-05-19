@@ -77,9 +77,20 @@
   "view": {
     "tooltip_board": "Vista tablero",
     "tooltip_list": "Vista lista",
+    "tooltip_gantt": "Vista Gantt",
     "section": "Vista",
     "board": "Tablero",
-    "list": "Lista"
+    "list": "Lista",
+    "gantt": "Gantt"
+  },
+  "gantt": {
+    "header_issue": "Tarea",
+    "zoom_day": "Día",
+    "zoom_week": "Semana",
+    "zoom_month": "Mes",
+    "show_completed": "Mostrar completadas",
+    "empty": "Aún no hay tareas programadas — establece una fecha de inicio o fecha límite en cualquier tarea para verla en la línea de tiempo.",
+    "inverted_dates_warning": "La fecha de inicio es posterior a la fecha límite — la barra se muestra del mínimo al máximo."
   },
   "actor_issues": {
     "scope": {
@@ -101,7 +112,9 @@
         "title": "Sin incidencias creadas",
         "description": "Las incidencias creadas aquí aparecerán en esta vista."
       }
-    }
+    },
+    "search_placeholder": "Buscar tareas...",
+    "search_empty": "Ninguna tarea coincide con tu búsqueda."
   },
   "list": {
     "empty_status": "Sin incidencias",
