@@ -72,6 +72,7 @@ import type {
   ChatMessage,
   ChatPendingTask,
   InvitationCreatedPayload,
+  ActiveTimerResponse,
 } from "../types";
 
 const chatWsLogger = createLogger("chat.ws");
@@ -335,6 +336,7 @@ export function useRealtimeSync(
       "time_entry:created",
       "time_entry:updated",
       "time_entry:deleted",
+      "timer:started",
       "timer:stopped",
       "timer:discarded",
       // Chat events are handled explicitly below; do not double-invalidate.
@@ -584,7 +586,18 @@ export function useRealtimeSync(
       }
     });
 
-    // --- Timer events (clear local timer state when backend stops/discards) ---
+    // --- Timer events ---
+
+    const unsubTimerStarted = ws.on("timer:started", (p) => {
+      const wsId = getCurrentWsId();
+      const { timer } = p as { timer?: ActiveTimerResponse };
+      if (timer) {
+        useTimerStore.getState().setTimerFromResponse(timer);
+        if (wsId) {
+          qc.setQueryData(["timer", "active", wsId], timer);
+        }
+      }
+    });
 
     const unsubTimerStopped = ws.on("timer:stopped", (p) => {
       const wsId = getCurrentWsId();
@@ -959,6 +972,7 @@ export function useRealtimeSync(
       unsubTimeEntryCreated();
       unsubTimeEntryDeleted();
       unsubTimeEntryUpdated();
+      unsubTimerStarted();
       unsubTimerStopped();
       unsubTimerDiscarded();
       unsubWsDeleted();
