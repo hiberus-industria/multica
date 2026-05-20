@@ -50,6 +50,7 @@ type Agent struct {
 	CustomArgs         []byte             `json:"custom_args"`
 	McpConfig          []byte             `json:"mcp_config"`
 	Model              pgtype.Text        `json:"model"`
+	ThinkingLevel      pgtype.Text        `json:"thinking_level"`
 }
 
 type AgentRuntime struct {
@@ -136,6 +137,7 @@ type Autopilot struct {
 	LastRunAt          pgtype.Timestamptz `json:"last_run_at"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	AssigneeType       string             `json:"assignee_type"`
 }
 
 type AutopilotRun struct {
@@ -152,6 +154,7 @@ type AutopilotRun struct {
 	TriggerPayload []byte             `json:"trigger_payload"`
 	Result         []byte             `json:"result"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SquadID        pgtype.UUID        `json:"squad_id"`
 }
 
 type AutopilotTrigger struct {
@@ -645,6 +648,7 @@ type User struct {
 	CloudWaitlistReason     pgtype.Text        `json:"cloud_waitlist_reason"`
 	StarterContentState     pgtype.Text        `json:"starter_content_state"`
 	Language                pgtype.Text        `json:"language"`
+	ProfileDescription      string             `json:"profile_description"`
 }
 
 type UserIntegrationCredential struct {

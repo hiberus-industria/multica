@@ -221,7 +221,7 @@ export function AttachmentPreviewModal({
       : "";
     const path = `${paths.workspace(slug).attachmentPreview(state.attachmentId)}${nameQuery}`;
     if (navigation.openInNewTab) {
-      navigation.openInNewTab(path, state.filename);
+      navigation.openInNewTab(path, state.filename, { activate: true });
     } else {
       const url = navigation.getShareableUrl(path);
       window.open(url, "_blank", "noopener,noreferrer");
@@ -352,7 +352,7 @@ function PreviewContent({
           <img
             src={state.mediaUrl}
             alt={state.filename}
-            className="max-h-full max-w-full rounded-lg object-contain"
+            className="h-full w-full rounded-lg object-contain"
           />
         </div>
       );
@@ -370,7 +370,7 @@ function PreviewContent({
           <video
             src={state.mediaUrl}
             controls
-            className="max-h-full max-w-full"
+            className="h-full w-full object-contain"
           />
         </div>
       );

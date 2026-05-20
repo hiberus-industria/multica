@@ -13,7 +13,6 @@ import { ModalRegistry } from "@multica/views/modals/registry";
 import { AppSidebar } from "@multica/views/layout";
 import { SearchCommand, SearchTrigger } from "@multica/views/search";
 import { ChatFab, ChatWindow } from "@multica/views/chat";
-import { StarterContentPrompt } from "@multica/views/onboarding";
 import { IdleDetector } from "@multica/views/time-tracking/idle-detector";
 import { TimerFinalStateGuard } from "@multica/views/time-tracking/timer-final-state-guard";
 import {
@@ -184,7 +183,6 @@ export function DesktopShell() {
         </div>
         {slug && <ModalRegistry />}
         {slug && <SearchCommand />}
-        {slug && <StarterContentPrompt />}
         {slug && <IdleDetector />}
         {slug && <TimerFinalStateGuard />}
         <WindowOverlay />
