@@ -113,17 +113,6 @@
     "step1_label": "Instala el CLI de Multica",
     "step2_label": "Inicia el daemon"
   },
-  "starter_content": {
-    "title": "Bienvenido — ¿añadir tareas de inicio?",
-    "description_prefix": "Un proyecto de ",
-    "description_term": "Primeros pasos",
-    "description_suffix": " con tareas breves que explican cómo funcionan los agentes, las incidencias y el contexto en Multica.",
-    "dismiss_action": "Empezar espacio de trabajo vacío",
-    "import_action": "Añadir tareas de inicio",
-    "success_toast": "Tareas de inicio añadidas — consulta tu barra lateral",
-    "import_failed": "Error al importar — por favor, reintenta",
-    "dismiss_failed": "No se pudo descartar — por favor, reintenta"
-  },
   "cloud_waitlist": {
     "intro_main": "Los runtimes en la nube aún no están activos. Deja tu email y te avisaremos cuando lo estén.",
     "intro_warning": "Aviso: los agentes no pueden ejecutar tareas sin un runtime — si pulsas Omitir ahora, tu espacio de trabajo es de solo lectura hasta que vuelvas a instalar uno.",

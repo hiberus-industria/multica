@@ -237,7 +237,9 @@
     "toast_update_partial_with_reason": "Autopiloto actualizado, pero la programación no se pudo guardar: {{reason}}",
     "toast_update_failed": "Error al actualizar el autopiloto",
     "section_agent": "Agente",
+    "section_assignee": "Asignado",
     "select_agent": "Seleccionar agente",
+    "select_assignee": "Seleccionar agente o squad",
     "section_output_mode": "Modo de salida",
     "section_schedule": "Programación",
     "section_trigger_kind": "Desencadenador",
@@ -326,7 +328,10 @@
   },
   "agent_picker": {
     "filter_placeholder": "Filtrar agentes...",
-    "select_agent": "Seleccionar agente"
+    "select_agent": "Seleccionar agente",
+    "select_assignee": "Seleccionar agente o squad",
+    "agents_group": "Agentes",
+    "squads_group": "Squads"
   },
   "timezone_picker": {
     "search_placeholder": "Buscar zona horaria..."

@@ -130,6 +130,7 @@
   },
   "detail": {
     "not_found": "Esta incidencia no existe o ha sido eliminada en este espacio de trabajo.",
+    "breadcrumb_project_unknown": "Proyecto desconocido",
     "back_to_issues": "Volver a Incidencias",
     "title_placeholder": "Título de la incidencia",
     "desc_placeholder": "Añadir descripción...",

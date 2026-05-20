@@ -130,6 +130,7 @@
     "section_skills": "Habilidades",
     "prop_runtime": "Runtime",
     "prop_model": "Modelo",
+    "prop_thinking": "Pensamiento",
     "prop_visibility": "Visibilidad",
     "prop_concurrency": "Concurrencia",
     "prop_owner": "Propietario",
@@ -172,7 +173,11 @@
     "model_custom_tooltip": "Usar \"{{value}}\" como ID de modelo personalizado",
     "model_custom_use": "Usar \"{{value}}\"",
     "model_clear": "Limpiar (usar predeterminado del proveedor)",
-    "model_clear_title": "Limpiar y usar el predeterminado del proveedor del runtime"
+    "model_clear_title": "Limpiar y usar el predeterminado del proveedor del runtime",
+    "thinking_default": "Seguir configuración del CLI",
+    "thinking_tooltip": "Pensamiento · {{value}}",
+    "thinking_clear": "Seguir configuración del CLI",
+    "thinking_clear_title": "Limpiar el ajuste y dejar que la configuración local del CLI (claude/codex) decida el nivel de razonamiento"
   },
   "model_dropdown": {
     "label": "Modelo",
