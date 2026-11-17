@@ -24,6 +24,12 @@ import { callbackErrorFrom, type CallbackError } from "./callback-error";
 
 const authLogger = createLogger("auth.callback");
 
+// HIBERUS: dev StrictMode double-invokes effects, and an OAuth code is
+// single-use — Keycloak revokes the tokens of the first exchange when the
+// code is replayed, so the loser of the race 401s on userinfo. Dedupe by
+// code; a failed exchange leaves the code dead anyway ("Back to login").
+const exchangedCodes = new Set<string>();
+
 function CallbackContent() {
   const { t } = useT("auth");
   const router = useRouter();
@@ -52,6 +58,8 @@ function CallbackContent() {
       setError({ kind: "missing_code" });
       return;
     }
+    if (exchangedCodes.has(code)) return;
+    exchangedCodes.add(code);
 
     const state = searchParams.get("state") || "";
     const stateParts = state.split(",");
