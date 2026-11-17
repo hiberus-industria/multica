@@ -1155,6 +1155,16 @@ export class ApiClient {
     });
   }
 
+  // HIBERUS: fork feature — completes the OIDC SSO flow started at
+  // /auth/oidc/start. The server matches `state` against the flow cookie it
+  // set on the start redirect, so the exact packed state must round-trip.
+  async oidcLogin(code: string, state: string, redirectUri: string): Promise<LoginResponse> {
+    return this.fetch("/auth/oidc", {
+      method: "POST",
+      body: JSON.stringify({ code, state, redirect_uri: redirectUri }),
+    });
+  }
+
   async logout(): Promise<void> {
     await this.fetch("/auth/logout", { method: "POST" });
   }

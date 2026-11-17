@@ -62,6 +62,8 @@ function LoginPageContent() {
   const qc = useQueryClient();
   const { t } = useT("auth");
   const googleClientId = useConfigStore((state) => state.googleClientId);
+  // HIBERUS: fork feature — public OIDC SSO config from /api/config.
+  const oidcConfig = useConfigStore((state) => state.oidc);
   const user = useAuthStore((s) => s.user);
   const isLoading = useAuthStore((s) => s.isLoading);
   const searchParams = useSearchParams();
@@ -167,6 +169,21 @@ function LoginPageContent() {
     .filter(Boolean)
     .join(",") || undefined;
 
+  // HIBERUS: fork feature — the SSO flow reuses the same packed state, with a
+  // leading "sso" marker so the callback page exchanges the code against
+  // /auth/oidc instead of /auth/google. The backend start route owns
+  // discovery, PKCE and the flow cookie; it validates the state against that
+  // cookie, so this exact string must round-trip through the provider.
+  const oidc = oidcConfig
+    ? {
+        startUrl: `/auth/oidc/start?state=${encodeURIComponent(
+          ["sso", googleState ?? ""].filter(Boolean).join(","),
+        )}&redirect_uri=${encodeURIComponent(`${window.location.origin}/auth/callback`)}`,
+        buttonLabel: oidcConfig.buttonLabel,
+        fallbackLabel: t(($) => $.web.sso_fallback),
+      }
+    : undefined;
+
   if (invalidCliCallback) return <CliCallbackError />;
 
   // While the desktop handoff is in progress (or has produced a token/error),
@@ -222,6 +239,9 @@ function LoginPageContent() {
   return (
     <LoginPage
       onSuccess={handleSuccess}
+      // HIBERUS: fork feature — with SSO enabled the card leads with the SSO
+      // button and hides the legacy methods until the fallback toggle.
+      oidc={oidc}
       google={
         googleClientId
           ? {
