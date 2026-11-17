@@ -70,6 +70,13 @@ Everything else in the SSO feature lives in fork-owned files: `server/internal/h
   `docker compose -f docker/keycloak/docker-compose.yml up -d`. The dev API is
   pointed at it with `OIDC_ENABLED=true`, `OIDC_ISSUER=http://localhost:8081/realms/devhi`,
   `OIDC_CLIENT_ID=multica-web`, `OIDC_CLIENT_SECRET=multica-web-local-secret`.
+  The registered redirect URIs cover the dev web port (13692) and 3000.
+- SSO verification status (2026-11-17): Go handler suite green (OIDC failure
+  matrix, JIT, gate, break-glass), plus a full end-to-end pass against the
+  local Keycloak — `/api/config` advertisement, start redirect with PKCE,
+  real login, code exchange, JWT session via `/api/me`, OTP gate refusal,
+  break-glass pass, and the browser flow through the web callback into the
+  app (see `bash` + Playwright traces in the PR).
 
 ## Roadmap
 
