@@ -41,13 +41,35 @@ This registry is the authoritative conflict-review list for every sync. Update i
 
 | File | Touch | Reason |
 | --- | --- | --- |
-| _(none yet)_ | | |
+| `server/internal/auth/cookie.go` | +6 lines (exported `SecureCookie`) | OIDC flow cookie reuses the deployment's Secure derivation instead of re-deriving it |
+| `server/internal/handler/auth.go` | 3 gate checks (4 lines each) | SSO gate on SendCode/VerifyCode/GoogleLogin (see `sso_gate.go`) |
+| `server/internal/handler/config.go` | 2 lines | Expose the public `oidc` block on `/api/config` |
+| `server/cmd/server/router.go` | 2 lines | Mount `GET /auth/oidc/start` and `POST /auth/oidc` |
+| `packages/core/api/schemas.ts` | interface field + zod field | Parse the additive `oidc` block from `/api/config` |
+| `packages/core/api/client.ts` | 1 method | `oidcLogin` exchange call |
+| `packages/core/auth/store.ts` | 1 action + 1 type | `loginWithOidc` mirrors `loginWithGoogle` |
+| `packages/core/config/index.ts` | field + setter plumbing | Carry the public SSO config to the login UIs |
+| `packages/core/platform/auth-initializer.tsx` | 2 lines | Forward `cfg.oidc` into the config store |
+| `packages/views/auth/login-page.tsx` | prop + SSO-only branch | SSO button, break-glass fallback toggle |
+| `apps/web/app/(auth)/login/page.tsx` | wiring (~15 lines) | Build `/auth/oidc/start` URL with the packed state |
+| `apps/web/app/auth/callback/page.tsx` | branch + error cases (~20 lines) | `sso` state marker selects the OIDC exchange |
+| `apps/web/app/auth/callback/callback-error.ts` | 2 error kinds | SSO-specific failure texts |
+| `apps/desktop/src/renderer/src/pages/login.tsx` | SSO button via system browser | Desktop SSO without an in-app OIDC client |
+| `packages/views/locales/*/auth.json` (×8) | 4 keys each | `signin.sso`, `web.sso_fallback`, 2 SSO callback errors |
 
-Planned next (SSO OIDC, phase 1): `server/cmd/server/router.go`, `server/internal/handler/config.go`, `server/internal/handler/auth.go`, `packages/core/auth/store.ts`, `packages/views/auth/login-page.tsx`, `apps/web/app/(auth)/login/page.tsx`, `apps/web/app/auth/callback/page.tsx`.
+Everything else in the SSO feature lives in fork-owned files: `server/internal/handler/oidc.go`, `server/internal/handler/sso_gate.go`, and their `*_test.go` files.
 
 ## History
 
 - 2026-11-17: fork re-established from upstream `main` (`6fc64f22`). The previous `hiberus-industria/multica` repo (an earlier fork attempt; its `main` carried 97 commits not in upstream) was deleted on GitHub because its recurring upstream conflicts were the problem this structure exists to avoid. A local backup of its branches remains in `refs/old-fork/heads/*` of a developer clone; porting any of that work is a fresh decision, not an inheritance.
+
+## Fork-owned infrastructure
+
+- `docker/keycloak/` — local Keycloak (realm `devhi`, client `multica-web`) for
+  SSO development and manual verification. Start with
+  `docker compose -f docker/keycloak/docker-compose.yml up -d`. The dev API is
+  pointed at it with `OIDC_ENABLED=true`, `OIDC_ISSUER=http://localhost:8081/realms/devhi`,
+  `OIDC_CLIENT_ID=multica-web`, `OIDC_CLIENT_SECRET=multica-web-local-secret`.
 
 ## Roadmap
 

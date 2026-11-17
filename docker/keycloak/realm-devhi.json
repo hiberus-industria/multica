@@ -1,0 +1,54 @@
+{
+  "realm": "devhi",
+  "enabled": true,
+  "loginWithEmailAllowed": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "sslRequired": "none",
+  "clients": [
+    {
+      "clientId": "multica-web",
+      "name": "Multica web",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "multica-web-local-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "dev@hiberus.com",
+      "email": "dev@hiberus.com",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ada",
+      "lastName": "Lovelace",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "devpassword",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
