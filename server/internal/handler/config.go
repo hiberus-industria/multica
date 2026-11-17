@@ -29,6 +29,10 @@ type AppConfig struct {
 	// toggle signup or wire Google OAuth.
 	AllowSignup    bool   `json:"allow_signup"`
 	GoogleClientID string `json:"google_client_id,omitempty"`
+	// HIBERUS: fork feature — public OIDC SSO config so the web login can
+	// show the SSO button without a frontend rebuild. Nil when SSO is off;
+	// the field itself is omitted so non-fork deployments keep their shape.
+	OIDC *OidcPublicConfig `json:"oidc,omitempty"`
 	// WorkspaceCreationDisabled mirrors the server-side
 	// DISABLE_WORKSPACE_CREATION env var so the UI can hide every
 	// "Create workspace" affordance on self-hosted instances. Omitted
@@ -139,7 +143,9 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		IssueBatchOpsSupported:             true,
 		AllowSignup:                        os.Getenv("ALLOW_SIGNUP") != "false",
 		GoogleClientID:                     os.Getenv("GOOGLE_CLIENT_ID"),
-		WorkspaceCreationDisabled:          os.Getenv("DISABLE_WORKSPACE_CREATION") == "true",
+		// HIBERUS: fork feature — OIDC SSO public config.
+		OIDC:                      OidcPublicConfigFromEnv(),
+		WorkspaceCreationDisabled: os.Getenv("DISABLE_WORKSPACE_CREATION") == "true",
 	}
 	if h.Storage != nil {
 		config.CdnDomain = h.Storage.CdnDomain()

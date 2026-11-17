@@ -41,6 +41,19 @@ interface CliCallbackConfig {
   state: string;
 }
 
+// HIBERUS: fork feature — OIDC SSO button config. The caller owns the start
+// URL (the web login page packs `state` and `redirect_uri` into
+// /auth/oidc/start; desktop points at the web login with platform=desktop).
+interface OidcAuthConfig {
+  startUrl: string;
+  /** Server-provided button label (OIDC_BUTTON_LABEL). */
+  buttonLabel?: string;
+  /** Shown under the SSO button to reveal the legacy email/OTP form. The
+   * server still enforces the break-glass allowlist — this only keeps the
+   * emergency path discoverable. */
+  fallbackLabel?: string;
+}
+
 interface LoginPageProps {
   /** Logo element rendered above the title */
   logo?: ReactNode;
@@ -55,6 +68,10 @@ interface LoginPageProps {
   onTokenObtained?: () => void;
   /** Override Google login handler (e.g. desktop opens browser externally). When provided, renders the Google button even if `google` config is omitted. */
   onGoogleLogin?: () => void;
+  /** HIBERUS: fork feature — OIDC SSO config. When present the login card
+   * leads with the SSO button and hides the email form until the fallback
+   * toggle is used. */
+  oidc?: OidcAuthConfig;
   /** Slot rendered at the bottom of the sign-in card, below the
    *  Google button. The web shell uses it for a "Prefer the desktop
    *  app?" prompt; desktop omits it (a download prompt inside the app
@@ -100,6 +117,7 @@ export function LoginPage({
   cliCallback,
   onTokenObtained,
   onGoogleLogin,
+  oidc,
   extra,
 }: LoginPageProps) {
   const { t } = useT("auth");
@@ -111,6 +129,9 @@ export function LoginPage({
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [existingUser, setExistingUser] = useState<User | null>(null);
+  // HIBERUS: fork feature — SSO-only mode hides the legacy form until the
+  // break-glass toggle is used.
+  const [ssoFallback, setSsoFallback] = useState(false);
   // Tracks how the existing session was detected so handleCliAuthorize
   // uses the matching token source (cookie → issueCliToken, localStorage → direct).
   const authSourceRef = useRef<"cookie" | "localStorage">("cookie");
@@ -293,6 +314,14 @@ export function LoginPage({
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   };
 
+  // HIBERUS: fork feature — send the browser through the backend's OIDC start
+  // route, which owns discovery, PKCE and the flow cookie.
+  const handleOidcLogin = () => {
+    if (!oidc) return;
+    // eslint-disable-next-line no-restricted-syntax -- SSO is a full-page redirect to the backend, then to the provider
+    window.location.href = oidc.startUrl;
+  };
+
   // CLI confirm step
 
   if (step === "cli_confirm" && existingUser) {
@@ -407,6 +436,12 @@ export function LoginPage({
 
   // Email step
 
+  // HIBERUS: fork feature — with SSO configured the card leads with the SSO
+  // button; the legacy email/OTP form stays reachable through the fallback
+  // toggle for break-glass accounts.
+  const ssoOnly = oidc !== undefined && !ssoFallback;
+  const ssoLabel = oidc?.buttonLabel || t(($) => $.signin.sso);
+
   return (
     <div className="flex min-h-svh items-center justify-center">
       <Card className="w-full max-w-sm">
@@ -416,7 +451,7 @@ export function LoginPage({
             {t(($) => $.signin.title)}
           </CardTitle>
           <CardDescription>
-            {t(($) => $.signin.description)}
+            {ssoOnly ? ssoLabel : t(($) => $.signin.description)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -427,65 +462,92 @@ export function LoginPage({
               </AlertDescription>
             </Alert>
           )}
-          <form id="login-form" onSubmit={handleSendCode} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="login-email">{t(($) => $.common.email)}</Label>
-              <Input
-                id="login-email"
-                type="email"
-                placeholder={t(($) => $.common.email_placeholder)}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoFocus
-                required
-              />
-            </div>
-            {error && (
-              <p className="text-body text-destructive">{error}</p>
-            )}
-          </form>
+          {!ssoOnly && (
+            <form id="login-form" onSubmit={handleSendCode} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">{t(($) => $.common.email)}</Label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  placeholder={t(($) => $.common.email_placeholder)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+              {error && (
+                <p className="text-body text-destructive">{error}</p>
+              )}
+            </form>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          <Button
-            type="submit"
-            form="login-form"
-            className="w-full"
-            size="lg"
-            disabled={!email || loading}
-          >
-            {loading
-              ? t(($) => $.signin.sending)
-              : t(($) => $.signin.continue)}
-          </Button>
-          {(google || onGoogleLogin) && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              size="lg"
-              onClick={handleGoogleLogin}
-              disabled={loading}
-            >
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  fill="#EA4335"
-                />
-              </svg>
-              {t(($) => $.signin.google)}
-            </Button>
+          {ssoOnly ? (
+            <>
+              <Button
+                type="button"
+                className="w-full"
+                size="lg"
+                onClick={handleOidcLogin}
+              >
+                {ssoLabel}
+              </Button>
+              {oidc.fallbackLabel && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setSsoFallback(true)}
+                >
+                  {oidc.fallbackLabel}
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <Button
+                type="submit"
+                form="login-form"
+                className="w-full"
+                size="lg"
+                disabled={!email || loading}
+              >
+                {loading
+                  ? t(($) => $.signin.sending)
+                  : t(($) => $.signin.continue)}
+              </Button>
+              {(google || onGoogleLogin) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  size="lg"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                >
+                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                    <path
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                      fill="#4285F4"
+                    />
+                    <path
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      fill="#EA4335"
+                    />
+                  </svg>
+                  {t(($) => $.signin.google)}
+                </Button>
+              )}
+            </>
           )}
           {extra && <div className="w-full pt-1 text-center">{extra}</div>}
         </CardFooter>

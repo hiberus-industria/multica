@@ -72,6 +72,9 @@ export function AuthInitializer({
         configStore.getState().setAuthConfig({
           allowSignup: cfg.allow_signup,
           googleClientId: cfg.google_client_id,
+          // HIBERUS: fork feature — public OIDC SSO config; absent on older
+          // servers and when SSO is disabled.
+          oidc: cfg.oidc ?? null,
           // Old servers omit this field — treat that as "creation allowed"
           // (the managed-cloud default) rather than blocking the UI.
           workspaceCreationDisabled: cfg.workspace_creation_disabled === true,

@@ -11,6 +11,9 @@ interface ConfigState {
   cdnSigned: boolean;
   allowSignup: boolean;
   googleClientId: string;
+  // HIBERUS: fork feature — public OIDC SSO config from /api/config. Null
+  // when the server has SSO disabled or predates the field.
+  oidc: { issuer: string; clientId: string; scopes: string; buttonLabel: string } | null;
   daemonServerUrl: string;
   daemonAppUrl: string;
   daemonConfigStatus: DaemonConfigStatus;
@@ -57,6 +60,12 @@ interface ConfigState {
   setAuthConfig: (config: {
     allowSignup: boolean;
     googleClientId?: string;
+    oidc?: {
+      issuer: string;
+      client_id: string;
+      scopes: string;
+      button_label: string;
+    } | null;
     workspaceCreationDisabled?: boolean;
     vcsIntegrationAvailable?: boolean;
   }) => void;
@@ -82,6 +91,7 @@ export const configStore = createStore<ConfigState>((set) => ({
   cdnSigned: false,
   allowSignup: true,
   googleClientId: "",
+  oidc: null,
   daemonServerUrl: "",
   daemonAppUrl: "",
   daemonConfigStatus: "loading",
@@ -101,9 +111,24 @@ export const configStore = createStore<ConfigState>((set) => ({
   setAuthConfig: ({
     allowSignup,
     googleClientId = "",
+    oidc = null,
     workspaceCreationDisabled = false,
     vcsIntegrationAvailable = false,
-  }) => set({ allowSignup, googleClientId, workspaceCreationDisabled, vcsIntegrationAvailable }),
+  }) =>
+    set({
+      allowSignup,
+      googleClientId,
+      oidc: oidc
+        ? {
+            issuer: oidc.issuer,
+            clientId: oidc.client_id,
+            scopes: oidc.scopes,
+            buttonLabel: oidc.button_label,
+          }
+        : null,
+      workspaceCreationDisabled,
+      vcsIntegrationAvailable,
+    }),
   setDaemonConfig: ({
     daemonServerUrl = "",
     daemonAppUrl = "",

@@ -11,6 +11,9 @@ export type CallbackError =
         | "signup_prohibited"
         | "email_not_allowed"
         | "google_account_no_email"
+        // HIBERUS: fork feature — OIDC SSO failure kinds.
+        | "oidc_account_no_email"
+        | "oidc_email_not_verified"
         | "oauth_code_invalid";
     }
   | { kind: "raw"; text: string };
@@ -31,6 +34,11 @@ export function callbackErrorFrom(err: unknown): CallbackError {
       return { kind: "email_not_allowed" };
     case "google_account_no_email":
       return { kind: "google_account_no_email" };
+    // HIBERUS: fork feature — OIDC SSO codes.
+    case "oidc_account_no_email":
+      return { kind: "oidc_account_no_email" };
+    case "oidc_email_not_verified":
+      return { kind: "oidc_email_not_verified" };
     case "oauth_code_invalid":
       return { kind: "oauth_code_invalid" };
     default:

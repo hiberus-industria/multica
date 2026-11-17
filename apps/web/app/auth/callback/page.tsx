@@ -24,12 +24,20 @@ import { callbackErrorFrom, type CallbackError } from "./callback-error";
 
 const authLogger = createLogger("auth.callback");
 
+// HIBERUS: dev StrictMode double-invokes effects, and an OAuth code is
+// single-use — Keycloak revokes the tokens of the first exchange when the
+// code is replayed, so the loser of the race 401s on userinfo. Dedupe by
+// code; a failed exchange leaves the code dead anyway ("Back to login").
+const exchangedCodes = new Set<string>();
+
 function CallbackContent() {
   const { t } = useT("auth");
   const router = useRouter();
   const searchParams = useSearchParams();
   const qc = useQueryClient();
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
+  // HIBERUS: fork feature — OIDC SSO login.
+  const loginWithOidc = useAuthStore((s) => s.loginWithOidc);
   const [error, setError] = useState<CallbackError | null>(null);
   const [desktopToken, setDesktopToken] = useState<string | null>(null);
 
@@ -50,9 +58,14 @@ function CallbackContent() {
       setError({ kind: "missing_code" });
       return;
     }
+    if (exchangedCodes.has(code)) return;
+    exchangedCodes.add(code);
 
     const state = searchParams.get("state") || "";
     const stateParts = state.split(",");
+    // HIBERUS: fork feature — "sso" marks a login that went through the OIDC
+    // start route; the rest of the packed state is shared with the Google flow.
+    const isOidc = stateParts.includes("sso");
     const isDesktop = stateParts.includes("platform:desktop");
     const nextPart = stateParts.find((p) => p.startsWith("next:"));
     // Strip "next:" prefix, then drop anything that isn't a safe relative path
@@ -84,33 +97,41 @@ function CallbackContent() {
 
     const redirectUri = `${window.location.origin}/auth/callback`;
 
+    // HIBERUS: fork feature — the "sso" marker in the state selects the OIDC
+    // exchange endpoint; everything downstream (CLI handoff, desktop deep
+    // link, post-auth routing) is identical for both providers.
+    const exchangeApi = isOidc
+      ? () => api.oidcLogin(code, state, redirectUri)
+      : () => api.googleLogin(code, redirectUri);
+
     if (cliCallback) {
-      // CLI login flow: exchange the Google code for a JWT, then redirect the
+      // CLI login flow: exchange the OAuth code for a JWT, then redirect the
       // token back to the CLI's local HTTP listener (e.g. WSL2 host).
-      api
-        .googleLogin(code, redirectUri)
+      exchangeApi()
         .then(({ token }) => {
           redirectToCliCallback(cliCallback, token, cliState);
         })
         .catch((err) => {
-          authLogger.error("CLI Google OAuth callback failed", err);
+          authLogger.error("CLI OAuth callback failed", err);
           setError(callbackErrorFrom(err));
         });
     } else if (isDesktop) {
       // Desktop flow: exchange code for token, then redirect via deep link
-      api
-        .googleLogin(code, redirectUri)
+      exchangeApi()
         .then(({ token }) => {
           setDesktopToken(token);
           window.location.href = `multica://auth/callback?token=${encodeURIComponent(token)}`;
         })
         .catch((err) => {
-          authLogger.error("Desktop Google OAuth callback failed", err);
+          authLogger.error("Desktop OAuth callback failed", err);
           setError(callbackErrorFrom(err));
         });
     } else {
-      // Normal web flow
-      loginWithGoogle(code, redirectUri)
+      // Normal web flow — through the store so cookie/token mode is handled.
+      const complete = isOidc
+        ? () => loginWithOidc(code, state, redirectUri)
+        : () => loginWithGoogle(code, redirectUri);
+      complete()
         .then(async (loggedInUser) => {
           const wsList = await api.listWorkspaces();
           qc.setQueryData(workspaceKeys.list(), wsList);
@@ -156,11 +177,11 @@ function CallbackContent() {
           router.push(resolvePostAuthDestination(wsList, onboarded));
         })
         .catch((err) => {
-          authLogger.error("Web Google OAuth callback failed", err);
+          authLogger.error("Web OAuth callback failed", err);
           setError(callbackErrorFrom(err));
         });
     }
-  }, [searchParams, loginWithGoogle, router, qc]);
+  }, [searchParams, loginWithGoogle, loginWithOidc, router, qc]);
 
   const errorDescription = (() => {
     if (!error) return null;
@@ -183,6 +204,11 @@ function CallbackContent() {
         return t(($) => $.web.callback.email_not_allowed);
       case "google_account_no_email":
         return t(($) => $.web.callback.google_account_no_email);
+      // HIBERUS: fork feature — OIDC SSO failure texts.
+      case "oidc_account_no_email":
+        return t(($) => $.web.callback.oidc_account_no_email);
+      case "oidc_email_not_verified":
+        return t(($) => $.web.callback.oidc_email_not_verified);
       case "oauth_code_invalid":
         return t(($) => $.web.callback.oauth_code_invalid);
     }

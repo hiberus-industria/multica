@@ -1044,6 +1044,14 @@ export interface AppConfigResponse {
   cdn_signed?: boolean;
   allow_signup: boolean;
   google_client_id?: string;
+  /** HIBERUS: fork feature — public OIDC SSO config. Absent when SSO is
+   * disabled; older servers never send it. */
+  oidc?: {
+    issuer: string;
+    client_id: string;
+    scopes: string;
+    button_label: string;
+  };
   posthog_key?: string;
   posthog_host?: string;
   analytics_environment?: string;
@@ -1355,6 +1363,16 @@ export const AppConfigSchema = z.object({
   cdn_signed: BooleanWithDefaultSchema(false),
   allow_signup: BooleanWithDefaultSchema(true),
   google_client_id: OptionalStringSchema,
+  // HIBERUS: fork feature — public OIDC SSO config, absent when disabled.
+  oidc: z
+    .object({
+      issuer: z.string().min(1),
+      client_id: z.string().min(1),
+      scopes: z.string().min(1),
+      button_label: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
   posthog_key: OptionalStringSchema,
   posthog_host: OptionalStringSchema,
   analytics_environment: OptionalStringSchema,
