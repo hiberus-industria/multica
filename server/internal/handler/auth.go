@@ -329,6 +329,12 @@ func (h *Handler) SendCode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "email is required")
 		return
 	}
+	// HIBERUS: SSO gate — OTP is closed while OIDC SSO is active, except for
+	// the break-glass emails in ALLOWED_EMAILS (see sso_gate.go).
+	if !h.ssoGateAllowsEmail(email) {
+		writeSSOGateBlocked(w)
+		return
+	}
 	if auth.IsTemporarilyDisabledUserEmail(email) {
 		writeError(w, http.StatusForbidden, auth.TemporarilyDisabledUserError)
 		return
@@ -421,6 +427,12 @@ func (h *Handler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 
 	if email == "" || code == "" {
 		writeError(w, http.StatusBadRequest, "email and code are required")
+		return
+	}
+	// HIBERUS: SSO gate — mirrors the SendCode gate so a code that leaked
+	// before SSO was enabled cannot be redeemed by a non-break-glass email.
+	if !h.ssoGateAllowsEmail(email) {
+		writeSSOGateBlocked(w)
 		return
 	}
 	if auth.IsTemporarilyDisabledUserEmail(email) {
@@ -577,6 +589,13 @@ func (h *Handler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 
 	if req.Code == "" {
 		writeError(w, http.StatusBadRequest, "code is required")
+		return
+	}
+
+	// HIBERUS: SSO gate — Google login is closed entirely while OIDC SSO is
+	// active. The break-glass path is OTP via ALLOWED_EMAILS, not Google.
+	if oidcSSOEnabled() {
+		writeSSOGateBlocked(w)
 		return
 	}
 

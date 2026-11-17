@@ -182,6 +182,14 @@ func isSecureCookie() bool {
 	return strings.EqualFold(u.Scheme, "https")
 }
 
+// HIBERUS: fork feature — the OIDC SSO flow cookie lives in the handler
+// package and needs the same deployment-derived Secure decision as the
+// session cookies above. Re-export rather than re-derive so the two can
+// never drift.
+func SecureCookie() bool {
+	return isSecureCookie()
+}
+
 // Two CSRF bindings exist side by side, and the pair is deliberate.
 //
 //   - Session-bound: HMAC-SHA256 keyed by the server's JWT secret over

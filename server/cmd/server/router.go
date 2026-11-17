@@ -1620,6 +1620,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	r.With(authRL).Post("/auth/send-code", h.SendCode)
 	r.With(authVerifyRL).Post("/auth/verify-code", h.VerifyCode)
 	r.With(authRL).Post("/auth/google", h.GoogleLogin)
+	// HIBERUS: fork feature — OIDC SSO login (see internal/handler/oidc.go).
+	r.With(authRL).Get("/auth/oidc/start", h.OidcStart)
+	r.With(authRL).Post("/auth/oidc", h.OidcLogin)
 	r.Post("/auth/logout", h.Logout)
 
 	// Public API
