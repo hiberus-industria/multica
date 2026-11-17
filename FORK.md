@@ -56,6 +56,7 @@ This registry is the authoritative conflict-review list for every sync. Update i
 | `apps/web/app/auth/callback/callback-error.ts` | 2 error kinds | SSO-specific failure texts |
 | `apps/desktop/src/renderer/src/pages/login.tsx` | SSO button via system browser | Desktop SSO without an in-app OIDC client |
 | `packages/views/locales/*/auth.json` (×8) | 4 keys each | `signin.sso`, `web.sso_fallback`, 2 SSO callback errors |
+| `apps/web/AGENTS.md` | new file (generated) | Written by `next dev` (Next 16 agent rules); committed as the file itself instructs so the tree stays clean |
 
 Everything else in the SSO feature lives in fork-owned files: `server/internal/handler/oidc.go`, `server/internal/handler/sso_gate.go`, and their `*_test.go` files.
 
